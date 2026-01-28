@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
   // Send email via Resend
   await getResend().emails.send({
-    from: "UFW CRM <noreply@ufwcrm.org>",
+    from: "UFW CRM <info@bigperro.dev>",
     to: email,
     subject: "Sign in to UFW CRM",
     html: `

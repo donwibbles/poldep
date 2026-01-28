@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
   for (const pref of users) {
     try {
       await getResend().emails.send({
-        from: "UFW CRM <noreply@ufwcrm.org>",
+        from: "UFW CRM <info@bigperro.dev>",
         to: pref.user.email,
         subject: `UFW CRM ${frequency.toLowerCase()} digest - ${format(now, "MMM d, yyyy")}`,
         html: htmlBody,
