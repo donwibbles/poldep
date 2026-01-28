@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Globe, Plus, XCircle, Briefcase, Award, MessageSquare } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Globe, Plus, XCircle, Briefcase, Award, MessageSquare, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,8 +39,11 @@ export default function ContactDetailPage() {
   const [endOpen, setEndOpen] = React.useState(false);
   const [endingAssignmentId, setEndingAssignmentId] = React.useState<string | null>(null);
   const [positionOpen, setPositionOpen] = React.useState(false);
+  const [editingPosition, setEditingPosition] = React.useState<any>(null);
   const [endPositionOpen, setEndPositionOpen] = React.useState(false);
   const [endingPositionId, setEndingPositionId] = React.useState<string | null>(null);
+  const [deletePositionTarget, setDeletePositionTarget] = React.useState<any>(null);
+  const [deletingPosition, setDeletingPosition] = React.useState(false);
   const [logCommOpen, setLogCommOpen] = React.useState(false);
 
   const fetchContact = React.useCallback(() => {
@@ -63,6 +66,20 @@ export default function ContactDetailPage() {
     }
     setDeleting(false);
     setDeleteOpen(false);
+  }
+
+  async function handleDeletePosition() {
+    if (!deletePositionTarget) return;
+    setDeletingPosition(true);
+    const res = await fetch(`/api/position-assignments/${deletePositionTarget.id}`, { method: "DELETE" });
+    if (res.ok) {
+      toast({ title: "Position deleted", variant: "success" });
+      fetchContact();
+    } else {
+      toast({ title: "Error", description: "Failed to delete position", variant: "destructive" });
+    }
+    setDeletingPosition(false);
+    setDeletePositionTarget(null);
   }
 
   if (loading) return <p className="text-sm text-gray-500">Loading...</p>;
@@ -259,15 +276,29 @@ export default function ContactDetailPage() {
                               <Badge variant={isActive ? "success" : "secondary"} className="text-xs">
                                 {isActive ? "Active" : "Ended"}
                               </Badge>
+                              <button
+                                className="text-gray-400 hover:text-blue-500"
+                                title="Edit position"
+                                onClick={() => { setEditingPosition(p); setPositionOpen(true); }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
                               {isActive && (
                                 <button
-                                  className="text-gray-400 hover:text-red-500"
+                                  className="text-gray-400 hover:text-orange-500"
                                   title="End position"
                                   onClick={() => { setEndingPositionId(p.id); setEndPositionOpen(true); }}
                                 >
                                   <XCircle className="h-4 w-4" />
                                 </button>
                               )}
+                              <button
+                                className="text-gray-400 hover:text-red-500"
+                                title="Delete position"
+                                onClick={() => setDeletePositionTarget(p)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
                             </div>
                           </div>
                           <p className="text-xs text-gray-500 mt-1">
@@ -336,8 +367,12 @@ export default function ContactDetailPage() {
 
       <PositionAssignmentDialog
         open={positionOpen}
-        onOpenChange={setPositionOpen}
+        onOpenChange={(open) => {
+          setPositionOpen(open);
+          if (!open) setEditingPosition(null);
+        }}
         contactId={id}
+        editPosition={editingPosition}
         onCreated={fetchContact}
       />
 
@@ -355,6 +390,17 @@ export default function ContactDetailPage() {
         contactName={`${contact.firstName} ${contact.lastName}`}
         endorsements={contact.endorsements || []}
         onCreated={fetchContact}
+      />
+
+      <ConfirmDialog
+        open={!!deletePositionTarget}
+        onOpenChange={(open) => { if (!open) setDeletePositionTarget(null); }}
+        title="Delete Position"
+        description={`Are you sure you want to delete the "${deletePositionTarget?.positionTitle}" position? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={handleDeletePosition}
+        loading={deletingPosition}
       />
     </div>
   );

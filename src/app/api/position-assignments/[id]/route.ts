@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuthApi } from "@/lib/auth-helpers";
 import { logActivity } from "@/lib/activity";
-import { endPositionSchema } from "@/lib/validations/position-assignment";
+import { updatePositionSchema } from "@/lib/validations/position-assignment";
 
 export async function GET(
   request: NextRequest,
@@ -35,7 +35,7 @@ export async function PATCH(
   const { id } = await params;
 
   const body = await request.json();
-  const parsed = endPositionSchema.safeParse(body);
+  const parsed = updatePositionSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
   }
@@ -48,12 +48,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Position assignment not found" }, { status: 404 });
   }
 
+  const updateData: any = {};
+  if (parsed.data.positionTitle !== undefined) updateData.positionTitle = parsed.data.positionTitle;
+  if (parsed.data.jurisdiction !== undefined) updateData.jurisdiction = parsed.data.jurisdiction;
+  if (parsed.data.startDate !== undefined) updateData.startDate = parsed.data.startDate;
+  if (parsed.data.endDate !== undefined) updateData.endDate = parsed.data.endDate;
+  if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes;
+
   const assignment = await prisma.positionAssignment.update({
     where: { id },
-    data: {
-      endDate: parsed.data.endDate,
-      notes: parsed.data.notes !== undefined ? parsed.data.notes : existing.notes,
-    },
+    data: updateData,
     include: {
       contact: { select: { id: true, firstName: true, lastName: true } },
     },
@@ -63,7 +67,7 @@ export async function PATCH(
     action: "UPDATE",
     entityType: "PositionAssignment",
     entityId: id,
-    summary: `Ended position "${assignment.positionTitle}" for ${assignment.contact.firstName} ${assignment.contact.lastName}`,
+    summary: `Updated position "${assignment.positionTitle}" for ${assignment.contact.firstName} ${assignment.contact.lastName}`,
     userId: session!.user.id,
   });
 
