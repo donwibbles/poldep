@@ -8,8 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useToast } from "@/hooks/use-toast";
+import { US_STATES, PARTIES } from "@/lib/constants";
 
 const CONTACT_TYPES = [
   { value: "", label: "All" },
@@ -17,6 +25,19 @@ const CONTACT_TYPES = [
   { value: "ELECTED_OFFICIAL", label: "Elected Officials" },
   { value: "STAFF", label: "Staff" },
   { value: "ORGANIZATION", label: "Organizations" },
+];
+
+const OFFICE_LEVELS = [
+  { value: "", label: "All Levels" },
+  { value: "FEDERAL", label: "Federal" },
+  { value: "STATE", label: "State" },
+  { value: "LOCAL", label: "Local" },
+];
+
+const SORT_OPTIONS = [
+  { value: "name_asc", label: "Name A-Z" },
+  { value: "name_desc", label: "Name Z-A" },
+  { value: "recent", label: "Recently Added" },
 ];
 
 const TYPE_COLORS: Record<string, "default" | "secondary" | "success" | "warning"> = {
@@ -72,6 +93,10 @@ export default function ContactsPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState("");
+  const [stateFilter, setStateFilter] = React.useState("");
+  const [partyFilter, setPartyFilter] = React.useState("");
+  const [officeLevelFilter, setOfficeLevelFilter] = React.useState("");
+  const [sortBy, setSortBy] = React.useState("name_asc");
   const debouncedSearch = useDebounce(search);
 
   const fetchContacts = React.useCallback(async () => {
@@ -80,6 +105,10 @@ export default function ContactsPage() {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (typeFilter) params.set("type", typeFilter);
+    if (stateFilter) params.set("state", stateFilter);
+    if (partyFilter) params.set("party", partyFilter);
+    if (officeLevelFilter) params.set("officeLevel", officeLevelFilter);
+    if (sortBy) params.set("sortBy", sortBy);
     params.set("page", pagination.page.toString());
 
     try {
@@ -97,7 +126,7 @@ export default function ContactsPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, typeFilter, pagination.page, toast]);
+  }, [debouncedSearch, typeFilter, stateFilter, partyFilter, officeLevelFilter, sortBy, pagination.page, toast]);
 
   React.useEffect(() => { fetchContacts(); }, [fetchContacts]);
 
@@ -115,27 +144,77 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            placeholder="Search contacts..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+      <div className="mt-4 space-y-3">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Search contacts..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {CONTACT_TYPES.map((t) => (
+              <Button
+                key={t.value}
+                variant={typeFilter === t.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => { setTypeFilter(t.value); setPagination((p) => ({ ...p, page: 1 })); }}
+              >
+                {t.label}
+              </Button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-1 flex-wrap">
-          {CONTACT_TYPES.map((t) => (
-            <Button
-              key={t.value}
-              variant={typeFilter === t.value ? "default" : "outline"}
-              size="sm"
-              onClick={() => { setTypeFilter(t.value); setPagination((p) => ({ ...p, page: 1 })); }}
-            >
-              {t.label}
-            </Button>
-          ))}
+
+        <div className="flex flex-wrap gap-2">
+          <Select value={stateFilter || "all"} onValueChange={(v) => { setStateFilter(v === "all" ? "" : v); setPagination((p) => ({ ...p, page: 1 })); }}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="All States" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All States</SelectItem>
+              {US_STATES.map((s) => (
+                <SelectItem key={s.abbr} value={s.abbr}>{s.abbr} - {s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={partyFilter || "all"} onValueChange={(v) => { setPartyFilter(v === "all" ? "" : v); setPagination((p) => ({ ...p, page: 1 })); }}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="All Parties" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Parties</SelectItem>
+              {PARTIES.map((p) => (
+                <SelectItem key={p} value={p}>{p}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={officeLevelFilter || "all"} onValueChange={(v) => { setOfficeLevelFilter(v === "all" ? "" : v); setPagination((p) => ({ ...p, page: 1 })); }}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue placeholder="All Levels" />
+            </SelectTrigger>
+            <SelectContent>
+              {OFFICE_LEVELS.map((l) => (
+                <SelectItem key={l.value || "all"} value={l.value || "all"}>{l.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setPagination((p) => ({ ...p, page: 1 })); }}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

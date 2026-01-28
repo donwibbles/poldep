@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireAuthApi } from "@/lib/auth-helpers";
 import { logActivity } from "@/lib/activity";
 import { contactSchema } from "@/lib/validations/contact";
+import { OFFICE_LEVELS } from "@/lib/constants";
 
 export async function GET(request: NextRequest) {
   const { session, error } = await requireAuthApi();
@@ -12,6 +13,10 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") || "";
   const type = searchParams.get("type") || "";
   const tag = searchParams.get("tag") || "";
+  const state = searchParams.get("state") || "";
+  const party = searchParams.get("party") || "";
+  const officeLevel = searchParams.get("officeLevel") || "";
+  const sortBy = searchParams.get("sortBy") || "name_asc";
   const MAX_LIMIT = 100;
   const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
   const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "25"), 1), MAX_LIMIT);
@@ -27,6 +32,27 @@ export async function GET(request: NextRequest) {
     where.tags = { has: tag };
   }
 
+  if (state) {
+    where.state = state;
+  }
+
+  if (party) {
+    where.party = party;
+  }
+
+  if (officeLevel) {
+    // Filter by position titles that match the office level
+    const positionTitles = OFFICE_LEVELS[officeLevel as keyof typeof OFFICE_LEVELS] || [];
+    if (positionTitles.length > 0) {
+      where.positionAssignments = {
+        some: {
+          positionTitle: { in: positionTitles as unknown as string[] },
+          endDate: null,
+        },
+      };
+    }
+  }
+
   if (search) {
     where.OR = [
       { firstName: { contains: search, mode: "insensitive" } },
@@ -36,10 +62,25 @@ export async function GET(request: NextRequest) {
     ];
   }
 
+  // Build orderBy based on sortBy parameter
+  let orderBy: any = [{ lastName: "asc" }, { firstName: "asc" }];
+  switch (sortBy) {
+    case "name_desc":
+      orderBy = [{ lastName: "desc" }, { firstName: "desc" }];
+      break;
+    case "recent":
+      orderBy = [{ createdAt: "desc" }];
+      break;
+    case "name_asc":
+    default:
+      orderBy = [{ lastName: "asc" }, { firstName: "asc" }];
+      break;
+  }
+
   const [contacts, total] = await Promise.all([
     prisma.contact.findMany({
       where,
-      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      orderBy,
       skip,
       take: limit,
       include: {

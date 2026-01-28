@@ -127,8 +127,52 @@ export const STAFF_ROLES = [
   "Other",
 ] as const;
 
+export const OFFICE_LEVELS = {
+  FEDERAL: [
+    "US President",
+    "US Vice President",
+    "US Senator",
+    "US Representative",
+  ],
+  STATE: [
+    "Governor",
+    "Lieutenant Governor",
+    "Attorney General",
+    "Secretary of State",
+    "State Treasurer",
+    "State Controller",
+    "Insurance Commissioner",
+    "State Senator",
+    "State Assembly Member",
+  ],
+  LOCAL: [
+    "Mayor",
+    "City Manager",
+    "County Executive",
+    "City Council Member",
+    "County Supervisor",
+    "Town Council Member",
+    "School Board Member",
+    "Community College Trustee",
+    "Special District Director",
+    "Supreme Court Justice",
+    "Appeals Court Justice",
+    "Superior Court Judge",
+    "District Attorney",
+    "Public Defender",
+  ],
+} as const;
+
+export function getOfficeLevel(positionTitle: string): "FEDERAL" | "STATE" | "LOCAL" | null {
+  if (OFFICE_LEVELS.FEDERAL.includes(positionTitle as any)) return "FEDERAL";
+  if (OFFICE_LEVELS.STATE.includes(positionTitle as any)) return "STATE";
+  if (OFFICE_LEVELS.LOCAL.includes(positionTitle as any)) return "LOCAL";
+  return null;
+}
+
 export type PositionTitle = (typeof POSITION_TITLES)[number];
 export type USState = (typeof US_STATES)[number];
 export type Party = (typeof PARTIES)[number];
 export type DistrictType = (typeof DISTRICT_TYPES)[number];
 export type StaffRole = (typeof STAFF_ROLES)[number];
+export type OfficeLevel = keyof typeof OFFICE_LEVELS;
