@@ -110,17 +110,27 @@ export default function PipelineSettingsPage() {
     const currentStage = stages[currentIndex];
     const swapStage = stages[newIndex];
 
-    // Update both stages with swapped orders
+    // Update both stages with swapped orders (only send schema-valid fields)
     const promises = [
       fetch(`/api/pipeline-stages/${currentStage.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...currentStage, order: swapStage.order }),
+        body: JSON.stringify({
+          name: currentStage.name,
+          order: swapStage.order,
+          isFinal: currentStage.isFinal,
+          color: currentStage.color,
+        }),
       }),
       fetch(`/api/pipeline-stages/${swapStage.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...swapStage, order: currentStage.order }),
+        body: JSON.stringify({
+          name: swapStage.name,
+          order: currentStage.order,
+          isFinal: swapStage.isFinal,
+          color: swapStage.color,
+        }),
       }),
     ];
 
