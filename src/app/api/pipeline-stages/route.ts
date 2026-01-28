@@ -57,14 +57,28 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  await prisma.$transaction(
-    parsed.data.stages.map((s) =>
-      prisma.pipelineStage.update({
+  // Two-phase update to avoid unique constraint violation on order field
+  // Phase 1: Set all to temporary negative orders
+  // Phase 2: Set to final orders
+  const offset = 10000;
+
+  await prisma.$transaction(async (tx) => {
+    // Phase 1: Move all affected stages to temporary negative orders
+    for (const s of parsed.data.stages) {
+      await tx.pipelineStage.update({
+        where: { id: s.id },
+        data: { order: -(s.order + offset) },
+      });
+    }
+
+    // Phase 2: Set final orders
+    for (const s of parsed.data.stages) {
+      await tx.pipelineStage.update({
         where: { id: s.id },
         data: { order: s.order },
-      })
-    )
-  );
+      });
+    }
+  });
 
   await logActivity({
     action: "REORDER",

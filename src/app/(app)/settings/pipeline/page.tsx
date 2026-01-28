@@ -106,38 +106,23 @@ export default function PipelineSettingsPage() {
 
     setReordering(true);
 
-    // Swap the two stages
+    // Swap the two stages' orders
     const currentStage = stages[currentIndex];
     const swapStage = stages[newIndex];
 
-    // Update both stages with swapped orders (only send schema-valid fields)
-    const promises = [
-      fetch(`/api/pipeline-stages/${currentStage.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: currentStage.name,
-          order: swapStage.order,
-          isFinal: currentStage.isFinal,
-          color: currentStage.color,
-        }),
+    // Use batch reorder endpoint to handle unique constraint properly
+    const res = await fetch("/api/pipeline-stages", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stages: [
+          { id: currentStage.id, order: swapStage.order },
+          { id: swapStage.id, order: currentStage.order },
+        ],
       }),
-      fetch(`/api/pipeline-stages/${swapStage.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: swapStage.name,
-          order: currentStage.order,
-          isFinal: swapStage.isFinal,
-          color: swapStage.color,
-        }),
-      }),
-    ];
+    });
 
-    const results = await Promise.all(promises);
-    const allOk = results.every(r => r.ok);
-
-    if (allOk) {
+    if (res.ok) {
       fetchStages();
     } else {
       toast({ title: "Error", description: "Failed to reorder stages", variant: "destructive" });
