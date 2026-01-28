@@ -179,12 +179,12 @@ export function LogCommunicationDialog({
           {endorsements.length > 0 && (
             <div>
               <Label>Link to Endorsement</Label>
-              <Select value={endorsementId} onValueChange={setEndorsementId}>
+              <Select value={endorsementId || "none"} onValueChange={(v) => setEndorsementId(v === "none" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="No endorsement" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No endorsement</SelectItem>
+                  <SelectItem value="none">No endorsement</SelectItem>
                   {endorsements.map((e) => (
                     <SelectItem key={e.id} value={e.id}>
                       {e.race.office}

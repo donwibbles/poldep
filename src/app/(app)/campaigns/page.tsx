@@ -129,12 +129,12 @@ export default function CampaignsPage() {
             className="pl-9"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
           <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All statuses</SelectItem>
+            <SelectItem value="all">All statuses</SelectItem>
             <SelectItem value="DRAFT">Draft</SelectItem>
             <SelectItem value="SCHEDULED">Scheduled</SelectItem>
             <SelectItem value="SENDING">Sending</SelectItem>
@@ -142,12 +142,12 @@ export default function CampaignsPage() {
             <SelectItem value="PAUSED">Paused</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
+        <Select value={typeFilter || "all"} onValueChange={(v) => setTypeFilter(v === "all" ? "" : v)}>
           <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="All types" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All types</SelectItem>
+            <SelectItem value="all">All types</SelectItem>
             <SelectItem value="ONE_TIME">One-time</SelectItem>
             <SelectItem value="DRIP_SEQUENCE">Drip Sequence</SelectItem>
           </SelectContent>

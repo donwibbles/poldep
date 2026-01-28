@@ -133,14 +133,14 @@ export default function NewCampaignPage() {
             <div>
               <Label>Email Template (optional)</Label>
               <Select
-                value={selectedTemplateId}
-                onValueChange={setSelectedTemplateId}
+                value={selectedTemplateId || "none"}
+                onValueChange={(v) => setSelectedTemplateId(v === "none" ? "" : v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a template or write custom content" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No template (custom)</SelectItem>
+                  <SelectItem value="none">No template (custom)</SelectItem>
                   {templates.map((template) => (
                     <SelectItem key={template.id} value={template.id}>
                       {template.name}

@@ -93,7 +93,8 @@ export default function EditCampaignPage() {
     });
   }, [params.id, router, toast]);
 
-  function handleTemplateChange(templateId: string) {
+  function handleTemplateChange(value: string) {
+    const templateId = value === "none" ? "" : value;
     setSelectedTemplateId(templateId);
     if (templateId) {
       const template = templates.find((t) => t.id === templateId);
@@ -182,14 +183,14 @@ export default function EditCampaignPage() {
             <div>
               <Label>Email Template (optional)</Label>
               <Select
-                value={selectedTemplateId}
+                value={selectedTemplateId || "none"}
                 onValueChange={handleTemplateChange}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a template or write custom content" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No template (custom)</SelectItem>
+                  <SelectItem value="none">No template (custom)</SelectItem>
                   {templates.map((template) => (
                     <SelectItem key={template.id} value={template.id}>
                       {template.name}

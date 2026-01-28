@@ -149,10 +149,10 @@ function NewEndorsementForm() {
               </div>
               <div>
                 <Label>Link to Previous Endorsement</Label>
-                <Select value={selectedPreviousId} onValueChange={setSelectedPreviousId}>
+                <Select value={selectedPreviousId || "none"} onValueChange={(v) => setSelectedPreviousId(v === "none" ? "" : v)}>
                   <SelectTrigger><SelectValue placeholder="No link (new endorsement)" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No link</SelectItem>
+                    <SelectItem value="none">No link</SelectItem>
                     {previousEndorsements.map((pe: any) => (
                       <SelectItem key={pe.id} value={pe.id}>
                         {pe.race?.office} ({pe.race?.election?.name}) - {pe.decision.replace(/_/g, " ")}
