@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { requireAuthApi, requireAdminApi } from "@/lib/auth-helpers";
 import { logActivity } from "@/lib/activity";
@@ -32,13 +31,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A user with this email already exists." }, { status: 409 });
   }
 
-  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
-
   const user = await prisma.user.create({
     data: {
       email: parsed.data.email,
       name: parsed.data.name,
-      passwordHash,
       role: parsed.data.role,
     },
     select: { id: true, email: true, name: true, role: true },

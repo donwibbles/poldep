@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, KeyRound } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,8 +17,6 @@ export default function UsersSettingsPage() {
   const [loading, setLoading] = React.useState(true);
   const [addOpen, setAddOpen] = React.useState(false);
   const [adding, setAdding] = React.useState(false);
-  const [resetTarget, setResetTarget] = React.useState<any>(null);
-  const [resetting, setResetting] = React.useState(false);
 
   const fetchUsers = () => {
     fetch("/api/settings/users").then((r) => r.json()).then((data) => { setUsers(data.users || []); setLoading(false); });
@@ -33,7 +31,6 @@ export default function UsersSettingsPage() {
     const data = {
       name: formData.get("name"),
       email: formData.get("email"),
-      password: formData.get("password"),
       role: formData.get("role") || "MEMBER",
     };
     const res = await fetch("/api/settings/users", {
@@ -52,25 +49,6 @@ export default function UsersSettingsPage() {
     setAdding(false);
   }
 
-  async function handleResetPassword(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setResetting(true);
-    const formData = new FormData(e.currentTarget);
-    const res = await fetch(`/api/settings/users/${resetTarget.id}/reset-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: formData.get("password") }),
-    });
-    if (res.ok) {
-      toast({ title: "Password reset", variant: "success" });
-      setResetTarget(null);
-    } else {
-      const err = await res.json();
-      toast({ title: "Error", description: err.error, variant: "destructive" });
-    }
-    setResetting(false);
-  }
-
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between">
@@ -86,7 +64,6 @@ export default function UsersSettingsPage() {
                 <p className="text-xs text-gray-500">{user.email}</p>
               </div>
               <Badge variant={user.role === "ADMIN" ? "default" : "secondary"}>{user.role}</Badge>
-              <Button variant="ghost" size="sm" onClick={() => setResetTarget(user)}><KeyRound className="h-4 w-4 mr-1" />Reset Password</Button>
             </CardContent>
           </Card>
         ))}
@@ -98,7 +75,6 @@ export default function UsersSettingsPage() {
           <form onSubmit={handleAddUser} className="space-y-4">
             <div><Label>Name *</Label><Input name="name" required /></div>
             <div><Label>Email *</Label><Input name="email" type="email" required /></div>
-            <div><Label>Password *</Label><Input name="password" type="password" required minLength={8} /></div>
             <div>
               <Label>Role</Label>
               <Select name="role" defaultValue="MEMBER">
@@ -112,19 +88,6 @@ export default function UsersSettingsPage() {
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={adding}>{adding ? "Creating..." : "Create User"}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open) setResetTarget(null); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Reset Password for {resetTarget?.name}</DialogTitle></DialogHeader>
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <div><Label>New Password *</Label><Input name="password" type="password" required minLength={8} /></div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setResetTarget(null)}>Cancel</Button>
-              <Button type="submit" disabled={resetting}>{resetting ? "Resetting..." : "Reset Password"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
