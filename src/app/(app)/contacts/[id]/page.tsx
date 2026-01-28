@@ -3,11 +3,13 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Globe, ExternalLink } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Globe, Plus, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { StaffAssignmentDialog } from "@/components/staff-assignment-dialog";
+import { EndAssignmentDialog } from "@/components/end-assignment-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/utils";
 
@@ -19,13 +21,18 @@ export default function ContactDetailPage() {
   const [loading, setLoading] = React.useState(true);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [assignOpen, setAssignOpen] = React.useState(false);
+  const [endOpen, setEndOpen] = React.useState(false);
+  const [endingAssignmentId, setEndingAssignmentId] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
+  const fetchContact = React.useCallback(() => {
     fetch(`/api/contacts/${id}`)
       .then((r) => r.json())
       .then(setContact)
       .finally(() => setLoading(false));
   }, [id]);
+
+  React.useEffect(() => { fetchContact(); }, [fetchContact]);
 
   async function handleDelete() {
     setDeleting(true);
@@ -42,6 +49,12 @@ export default function ContactDetailPage() {
 
   if (loading) return <p className="text-sm text-gray-500">Loading...</p>;
   if (!contact) return <p className="text-sm text-red-500">Contact not found.</p>;
+
+  const isStaff = contact.type === "STAFF";
+  // For STAFF contacts: show "Assignments" (who they work for) using staffAssignments
+  // For non-STAFF: show "Staff" (who works for them) using parentAssignments
+  const assignments = isStaff ? (contact.staffAssignments || []) : (contact.parentAssignments || []);
+  const assignmentLabel = isStaff ? "Assignments" : "Staff";
 
   return (
     <div>
@@ -128,22 +141,56 @@ export default function ContactDetailPage() {
             </Card>
           )}
 
-          {contact.staffMembers?.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>Staff</CardTitle></CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {contact.staffMembers.map((s: any) => (
-                    <li key={s.id}>
-                      <Link href={`/contacts/${s.id}`} className="text-sm text-blue-600 hover:underline">
-                        {s.firstName} {s.lastName}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>{assignmentLabel} ({assignments.length})</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setAssignOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" />Add
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {assignments.length === 0 ? (
+                <p className="text-sm text-gray-500">No {assignmentLabel.toLowerCase()} assigned.</p>
+              ) : (
+                <div className="space-y-3">
+                  {assignments.map((a: any) => {
+                    const linkedContact = isStaff ? a.parentContact : a.staffContact;
+                    const isActive = !a.endDate;
+                    return (
+                      <div key={a.id} className="rounded-lg border p-3">
+                        <div className="flex items-center justify-between">
+                          <Link href={`/contacts/${linkedContact.id}`} className="text-sm font-medium text-blue-600 hover:underline">
+                            {linkedContact.firstName} {linkedContact.lastName}
+                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={isActive ? "success" : "secondary"} className="text-xs">
+                              {isActive ? "Active" : "Ended"}
+                            </Badge>
+                            {isActive && (
+                              <button
+                                className="text-gray-400 hover:text-red-500"
+                                title="End assignment"
+                                onClick={() => { setEndingAssignmentId(a.id); setEndOpen(true); }}
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {formatDate(a.startDate)}
+                          {a.endDate ? ` – ${formatDate(a.endDate)}` : " – Present"}
+                        </p>
+                        {a.notes && <p className="text-xs text-gray-400 mt-1">{a.notes}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {contact.endorsements?.length > 0 && (
             <Card>
@@ -178,6 +225,21 @@ export default function ContactDetailPage() {
         variant="destructive"
         onConfirm={handleDelete}
         loading={deleting}
+      />
+
+      <StaffAssignmentDialog
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        contactId={id}
+        contactType={contact.type}
+        onCreated={fetchContact}
+      />
+
+      <EndAssignmentDialog
+        open={endOpen}
+        onOpenChange={setEndOpen}
+        assignmentId={endingAssignmentId}
+        onEnded={fetchContact}
       />
     </div>
   );

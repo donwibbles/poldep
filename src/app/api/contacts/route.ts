@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
           select: {
             communications: true,
             endorsements: true,
-            staffMembers: true,
+            parentAssignments: true,
           },
         },
       },

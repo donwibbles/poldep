@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const contactSchema = z.object({
+export const importRowSchema = z.object({
   type: z.enum(["CANDIDATE", "ELECTED_OFFICIAL", "STAFF", "ORGANIZATION"]),
   firstName: z.string().min(1, "First name is required").max(100),
   lastName: z.string().min(1, "Last name is required").max(100),
@@ -22,4 +22,8 @@ export const contactSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
-export type ContactFormData = z.infer<typeof contactSchema>;
+export const importBatchSchema = z.object({
+  rows: z.array(importRowSchema).min(1).max(1000),
+});
+
+export type ImportRowData = z.infer<typeof importRowSchema>;

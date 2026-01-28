@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -57,9 +57,14 @@ export default function ContactsPage() {
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
-        <Link href="/contacts/new">
-          <Button><Plus className="h-4 w-4 mr-2" />Add Contact</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/contacts/import">
+            <Button variant="outline"><Upload className="h-4 w-4 mr-2" />Import CSV</Button>
+          </Link>
+          <Link href="/contacts/new">
+            <Button><Plus className="h-4 w-4 mr-2" />Add Contact</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">

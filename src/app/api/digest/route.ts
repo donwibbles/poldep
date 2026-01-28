@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getResend } from "@/lib/resend";
 import { checkDigestRateLimit } from "@/lib/rate-limit";
 import { format, subDays, subWeeks } from "date-fns";
+import { buildDigestHtml } from "@/lib/email-templates/digest";
 
 export async function POST(request: NextRequest) {
   // Bearer token auth
@@ -30,7 +31,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "No users subscribed to this digest frequency." });
   }
 
-  const since = frequency === "DAILY" ? subDays(new Date(), 1) : subWeeks(new Date(), 1);
+  const now = new Date();
+  const since = frequency === "DAILY" ? subDays(now, 1) : subWeeks(now, 1);
+  const dateRange = `${format(since, "MMM d")} – ${format(now, "MMM d, yyyy")}`;
 
   const [recentActivity, upcomingTasks, pipelineSummary] = await Promise.all([
     prisma.activityLog.findMany({
@@ -51,11 +54,33 @@ export async function POST(request: NextRequest) {
     }),
   ]);
 
+  // Plain text fallback
   const activityList = recentActivity.map((a) => `- ${a.summary} (${a.user.name})`).join("\n") || "No recent activity.";
   const taskList = upcomingTasks.map((t) => `- ${t.title}${t.dueDate ? ` (due ${format(t.dueDate, "MMM d")})` : ""}`).join("\n") || "No upcoming tasks.";
   const pipelineList = pipelineSummary.map((s) => `- ${s.name}: ${s._count.endorsements}`).join("\n");
+  const emailBody = `UFW CRM ${frequency.toLowerCase()} Digest - ${format(now, "MMM d, yyyy")}\n\nRecent Activity:\n${activityList}\n\nUpcoming Tasks:\n${taskList}\n\nEndorsement Pipeline:\n${pipelineList}`;
 
-  const emailBody = `UFW CRM ${frequency.toLowerCase()} Digest - ${format(new Date(), "MMM d, yyyy")}\n\nRecent Activity:\n${activityList}\n\nUpcoming Tasks:\n${taskList}\n\nEndorsement Pipeline:\n${pipelineList}`;
+  // Structured HTML email
+  const htmlBody = buildDigestHtml({
+    frequency: frequency === "DAILY" ? "Daily" : "Weekly",
+    dateRange,
+    activities: recentActivity.map((a) => ({
+      summary: a.summary,
+      userName: a.user.name,
+      action: a.action,
+      createdAt: a.createdAt,
+    })),
+    tasks: upcomingTasks.map((t) => ({
+      title: t.title,
+      dueDate: t.dueDate,
+      assigneeName: t.assignedTo?.name ?? null,
+    })),
+    pipelineStages: pipelineSummary.map((s) => ({
+      name: s.name,
+      color: s.color,
+      count: s._count.endorsements,
+    })),
+  });
 
   const results = [];
   for (const pref of users) {
@@ -63,7 +88,8 @@ export async function POST(request: NextRequest) {
       await getResend().emails.send({
         from: "UFW CRM <noreply@ufwcrm.org>",
         to: pref.user.email,
-        subject: `UFW CRM ${frequency.toLowerCase()} digest - ${format(new Date(), "MMM d, yyyy")}`,
+        subject: `UFW CRM ${frequency.toLowerCase()} digest - ${format(now, "MMM d, yyyy")}`,
+        html: htmlBody,
         text: emailBody,
       });
       results.push({ email: pref.user.email, status: "sent" });

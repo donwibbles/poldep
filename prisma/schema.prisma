@@ -99,20 +99,34 @@ model Contact {
   instagram       String?
   tags            String[]
   notes           String?
-  parentContactId String?
-  parentContact   Contact?  @relation("ContactStaff", fields: [parentContactId], references: [id], onDelete: SetNull)
-  staffMembers    Contact[] @relation("ContactStaff")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  communications CommunicationContact[]
-  endorsements   Endorsement[]
-  raceCandidates RaceCandidate[]
-  tasks          Task[]
-  attachments    Attachment[]
+  communications     CommunicationContact[]
+  endorsements       Endorsement[]
+  raceCandidates     RaceCandidate[]
+  tasks              Task[]
+  attachments        Attachment[]
+  staffAssignments   StaffAssignment[] @relation("StaffAssignments")
+  parentAssignments  StaffAssignment[] @relation("ParentAssignments")
 
   @@index([lastName, firstName])
   @@index([tags], type: Gin)
+}
+
+model StaffAssignment {
+  id              String    @id @default(cuid())
+  staffContactId  String
+  staffContact    Contact   @relation("StaffAssignments", fields: [staffContactId], references: [id], onDelete: Cascade)
+  parentContactId String
+  parentContact   Contact   @relation("ParentAssignments", fields: [parentContactId], references: [id], onDelete: Cascade)
+  startDate       DateTime  @default(now())
+  endDate         DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+
+  @@index([staffContactId])
+  @@index([parentContactId])
 }
 
 model Communication {

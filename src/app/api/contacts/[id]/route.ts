@@ -16,8 +16,14 @@ export async function GET(
   const contact = await prisma.contact.findUnique({
     where: { id },
     include: {
-      parentContact: true,
-      staffMembers: true,
+      staffAssignments: {
+        include: { parentContact: { select: { id: true, firstName: true, lastName: true, type: true } } },
+        orderBy: { startDate: "desc" },
+      },
+      parentAssignments: {
+        include: { staffContact: { select: { id: true, firstName: true, lastName: true, type: true } } },
+        orderBy: { startDate: "desc" },
+      },
       communications: {
         include: {
           communication: {
