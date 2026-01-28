@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { POSITION_TITLES } from "@/lib/constants";
 
 interface PositionAssignmentDialogProps {
   open: boolean;
@@ -80,11 +82,18 @@ export function PositionAssignmentDialog({
         <div className="space-y-4">
           <div>
             <Label>Position Title *</Label>
-            <Input
-              placeholder="e.g., City Council Member"
-              value={positionTitle}
-              onChange={(e) => setPositionTitle(e.target.value)}
-            />
+            <Select value={positionTitle} onValueChange={setPositionTitle}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select position title" />
+              </SelectTrigger>
+              <SelectContent>
+                {POSITION_TITLES.map((title) => (
+                  <SelectItem key={title} value={title}>
+                    {title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>

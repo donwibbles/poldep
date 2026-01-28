@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/ui/pagination";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useToast } from "@/hooks/use-toast";
 
 const CONTACT_TYPES = [
   { value: "", label: "All" },
@@ -63,29 +64,40 @@ function getRoleAssignment(contact: any): string {
 
 export default function ContactsPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   const [contacts, setContacts] = React.useState<any[]>([]);
   const [pagination, setPagination] = React.useState({ page: 1, totalPages: 1, total: 0 });
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState("");
   const debouncedSearch = useDebounce(search);
 
   const fetchContacts = React.useCallback(async () => {
     setLoading(true);
+    setError(null);
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (typeFilter) params.set("type", typeFilter);
     params.set("page", pagination.page.toString());
 
-    const res = await fetch(`/api/contacts?${params}`);
-    if (res.ok) {
+    try {
+      const res = await fetch(`/api/contacts?${params}`);
+      if (!res.ok) {
+        throw new Error(res.status === 401 ? "Please log in" : "Failed to load contacts");
+      }
       const data = await res.json();
       setContacts(data.contacts);
       setPagination(data.pagination);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An error occurred";
+      setError(message);
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [debouncedSearch, typeFilter, pagination.page]);
+  }, [debouncedSearch, typeFilter, pagination.page, toast]);
 
   React.useEffect(() => { fetchContacts(); }, [fetchContacts]);
 
@@ -130,6 +142,11 @@ export default function ContactsPage() {
       <div className="mt-6">
         {loading ? (
           <p className="text-sm text-gray-500">Loading...</p>
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-red-600">{error}</p>
+            <Button onClick={fetchContacts} variant="outline" className="mt-2">Retry</Button>
+          </div>
         ) : contacts.length === 0 ? (
           <p className="text-sm text-gray-500">No contacts found.</p>
         ) : (
@@ -148,7 +165,20 @@ export default function ContactsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {contacts.map((contact: any) => (
-                    <tr key={contact.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/contacts/${contact.id}`)}>
+                    <tr
+                      key={contact.id}
+                      tabIndex={0}
+                      role="link"
+                      aria-label={`View ${contact.firstName} ${contact.lastName}`}
+                      className="hover:bg-gray-50 cursor-pointer focus:bg-blue-50 focus:outline-none"
+                      onClick={() => router.push(`/contacts/${contact.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          router.push(`/contacts/${contact.id}`);
+                        }
+                      }}
+                    >
                       <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
                         {contact.firstName} {contact.lastName}
                       </td>

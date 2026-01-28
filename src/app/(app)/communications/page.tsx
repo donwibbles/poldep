@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/ui/pagination";
 import { formatDate } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 const COMM_TYPES = [
   { value: "", label: "All" },
@@ -23,19 +24,38 @@ const COMM_TYPES = [
 
 export default function CommunicationsPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [comms, setComms] = React.useState<any[]>([]);
   const [pagination, setPagination] = React.useState({ page: 1, totalPages: 1 });
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [typeFilter, setTypeFilter] = React.useState("");
 
-  React.useEffect(() => {
+  const fetchData = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
     const params = new URLSearchParams();
     if (typeFilter) params.set("type", typeFilter);
     params.set("page", pagination.page.toString());
-    fetch(`/api/communications?${params}`)
-      .then((r) => r.json())
-      .then((data) => { setComms(data.communications || []); setPagination(data.pagination); setLoading(false); });
-  }, [typeFilter, pagination.page]);
+
+    try {
+      const res = await fetch(`/api/communications?${params}`);
+      if (!res.ok) {
+        throw new Error(res.status === 401 ? "Please log in" : "Failed to load communications");
+      }
+      const data = await res.json();
+      setComms(data.communications || []);
+      setPagination(data.pagination);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An error occurred";
+      setError(message);
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [typeFilter, pagination.page, toast]);
+
+  React.useEffect(() => { fetchData(); }, [fetchData]);
 
   return (
     <div>
@@ -49,7 +69,12 @@ export default function CommunicationsPage() {
         ))}
       </div>
       <div className="mt-6">
-        {loading ? <p className="text-sm text-gray-500">Loading...</p> : comms.length === 0 ? <p className="text-sm text-gray-500">No communications yet.</p> : (
+        {loading ? <p className="text-sm text-gray-500">Loading...</p> : error ? (
+          <div className="text-center py-8">
+            <p className="text-red-600">{error}</p>
+            <Button onClick={fetchData} variant="outline" className="mt-2">Retry</Button>
+          </div>
+        ) : comms.length === 0 ? <p className="text-sm text-gray-500">No communications yet.</p> : (
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -64,7 +89,20 @@ export default function CommunicationsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {comms.map((c) => (
-                    <tr key={c.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/communications/${c.id}`)}>
+                    <tr
+                      key={c.id}
+                      tabIndex={0}
+                      role="link"
+                      aria-label={`View communication: ${c.subject}`}
+                      className="hover:bg-gray-50 cursor-pointer focus:bg-blue-50 focus:outline-none"
+                      onClick={() => router.push(`/communications/${c.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          router.push(`/communications/${c.id}`);
+                        }
+                      }}
+                    >
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{formatDate(c.date)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm"><Badge variant="outline">{c.type.replace(/_/g, " ")}</Badge></td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{c.subject}</td>

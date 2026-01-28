@@ -194,20 +194,23 @@ model PipelineStage {
 }
 
 model Endorsement {
-  id             String              @id @default(cuid())
-  decision       EndorsementDecision @default(PENDING)
-  candidateId    String
-  candidate      Contact             @relation(fields: [candidateId], references: [id])
-  raceId         String
-  race           Race                @relation(fields: [raceId], references: [id])
-  currentStageId String
-  currentStage   PipelineStage       @relation(fields: [currentStageId], references: [id])
-  assignedToId   String?
-  assignedTo     User?               @relation(fields: [assignedToId], references: [id])
-  notes          String?
-  lockedAt       DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  id                    String              @id @default(cuid())
+  decision              EndorsementDecision @default(PENDING)
+  candidateId           String
+  candidate             Contact             @relation(fields: [candidateId], references: [id])
+  raceId                String
+  race                  Race                @relation(fields: [raceId], references: [id])
+  currentStageId        String
+  currentStage          PipelineStage       @relation(fields: [currentStageId], references: [id])
+  assignedToId          String?
+  assignedTo            User?               @relation(fields: [assignedToId], references: [id])
+  notes                 String?
+  lockedAt              DateTime?
+  previousEndorsementId String?
+  previousEndorsement   Endorsement?        @relation("ReEndorsement", fields: [previousEndorsementId], references: [id])
+  reEndorsements        Endorsement[]       @relation("ReEndorsement")
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
 
   stageHistory   EndorsementStageHistory[]
   communications Communication[]

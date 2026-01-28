@@ -179,6 +179,37 @@ export default function EndorsementDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {endorsement.previousEndorsement && (
+            <Card>
+              <CardHeader><CardTitle>Previous Endorsement</CardTitle></CardHeader>
+              <CardContent>
+                <Link href={`/endorsements/${endorsement.previousEndorsement.id}`} className="block rounded border p-2 hover:bg-gray-50">
+                  <p className="text-sm font-medium">{endorsement.previousEndorsement.race?.office}{endorsement.previousEndorsement.race?.district ? ` - ${endorsement.previousEndorsement.race.district}` : ""}</p>
+                  <p className="text-xs text-gray-500">{endorsement.previousEndorsement.race?.election?.name}</p>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
+          {endorsement.reEndorsements?.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>Re-endorsements ({endorsement.reEndorsements.length})</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {endorsement.reEndorsements.map((re: any) => (
+                    <Link key={re.id} href={`/endorsements/${re.id}`} className="block rounded border p-2 hover:bg-gray-50">
+                      <p className="text-sm font-medium">{re.race?.office}{re.race?.district ? ` - ${re.race.district}` : ""}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-xs" style={{ borderColor: re.currentStage?.color }}>{re.currentStage?.name}</Badge>
+                        <span className="text-xs text-gray-500">{re.race?.election?.name}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

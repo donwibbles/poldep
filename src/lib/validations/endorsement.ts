@@ -6,6 +6,7 @@ export const endorsementSchema = z.object({
   currentStageId: z.string().min(1, "Stage is required"),
   assignedToId: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  previousEndorsementId: z.string().optional().nullable(),
 });
 
 export const advanceStageSchema = z.object({

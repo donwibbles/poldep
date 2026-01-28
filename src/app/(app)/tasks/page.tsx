@@ -13,16 +13,31 @@ export default function TasksPage() {
   const { toast } = useToast();
   const [tasks, setTasks] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [statusFilter, setStatusFilter] = React.useState("");
 
-  const fetchTasks = React.useCallback(() => {
+  const fetchTasks = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
     const params = new URLSearchParams();
     if (statusFilter) params.set("status", statusFilter);
     params.set("limit", "100");
-    fetch(`/api/tasks?${params}`)
-      .then((r) => r.json())
-      .then((data) => { setTasks(data.tasks || []); setLoading(false); });
-  }, [statusFilter]);
+
+    try {
+      const res = await fetch(`/api/tasks?${params}`);
+      if (!res.ok) {
+        throw new Error(res.status === 401 ? "Please log in" : "Failed to load tasks");
+      }
+      const data = await res.json();
+      setTasks(data.tasks || []);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An error occurred";
+      setError(message);
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, toast]);
 
   React.useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
@@ -52,7 +67,12 @@ export default function TasksPage() {
         ))}
       </div>
       <div className="mt-6 space-y-2">
-        {loading ? <p className="text-sm text-gray-500">Loading...</p> : tasks.length === 0 ? <p className="text-sm text-gray-500">No tasks.</p> : (
+        {loading ? <p className="text-sm text-gray-500">Loading...</p> : error ? (
+          <div className="text-center py-8">
+            <p className="text-red-600">{error}</p>
+            <Button onClick={fetchTasks} variant="outline" className="mt-2">Retry</Button>
+          </div>
+        ) : tasks.length === 0 ? <p className="text-sm text-gray-500">No tasks.</p> : (
           tasks.map((task) => (
             <Card key={task.id}>
               <CardContent className="flex items-center gap-3 p-4">

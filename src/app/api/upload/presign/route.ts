@@ -22,6 +22,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
+  // Verify entity exists before creating presigned URL
+  if (entityType === "contact") {
+    const contact = await prisma.contact.findUnique({ where: { id: entityId } });
+    if (!contact) {
+      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    }
+  } else if (entityType === "communication") {
+    const communication = await prisma.communication.findUnique({ where: { id: entityId } });
+    if (!communication) {
+      return NextResponse.json({ error: "Communication not found" }, { status: 404 });
+    }
+  } else if (entityType === "endorsement") {
+    const endorsement = await prisma.endorsement.findUnique({ where: { id: entityId } });
+    if (!endorsement) {
+      return NextResponse.json({ error: "Endorsement not found" }, { status: 404 });
+    }
+  }
+
   const fileKey = `${entityType}/${entityId}/${randomUUID()}-${fileName}`;
   const uploadUrl = await getUploadUrl(fileKey, mimeType, fileSize);
 

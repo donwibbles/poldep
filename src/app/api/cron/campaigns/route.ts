@@ -3,9 +3,16 @@ import { prisma } from "@/lib/db";
 import { sendCampaign, sendDripStep } from "@/lib/campaign-sender";
 
 export async function POST(request: NextRequest) {
-  // Bearer token auth - use same secret as digest
+  // Bearer token auth - use separate CRON_SECRET for campaign cron jobs
   const authHeader = request.headers.get("authorization");
-  if (!authHeader || authHeader !== `Bearer ${process.env.DIGEST_SECRET}`) {
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    console.error("CRON_SECRET environment variable is not configured");
+    return NextResponse.json({ error: "Cron not configured" }, { status: 500 });
+  }
+
+  if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

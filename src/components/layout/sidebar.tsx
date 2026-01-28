@@ -22,7 +22,7 @@ const navigation = [
   { name: "Endorsements", href: "/endorsements", icon: Award },
   { name: "Elections", href: "/elections", icon: Vote },
   { name: "Tasks", href: "/tasks", icon: CheckSquare },
-  { name: "Settings", href: "/settings/pipeline", icon: Settings },
+  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar() {
@@ -32,7 +32,7 @@ export function Sidebar() {
     <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
       <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4">
         <div className="flex h-16 shrink-0 items-center">
-          <h1 className="text-xl font-bold text-gray-900">UFW CRM</h1>
+          <h1 className="text-xl font-bold text-gray-900">UFW</h1>
         </div>
         <nav className="flex flex-1 flex-col">
           <ul className="flex flex-1 flex-col gap-y-1">

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Globe, Plus, XCircle, Briefcase } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Globe, Plus, XCircle, Briefcase, Award, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,8 +12,10 @@ import { StaffAssignmentDialog } from "@/components/staff-assignment-dialog";
 import { EndAssignmentDialog } from "@/components/end-assignment-dialog";
 import { PositionAssignmentDialog } from "@/components/position-assignment-dialog";
 import { EndPositionDialog } from "@/components/end-position-dialog";
+import { LogCommunicationDialog } from "@/components/log-communication-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/utils";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 const TAX_STATUS_LABELS: Record<string, string> = {
   C501C3: "501(c)(3)",
@@ -39,6 +41,7 @@ export default function ContactDetailPage() {
   const [positionOpen, setPositionOpen] = React.useState(false);
   const [endPositionOpen, setEndPositionOpen] = React.useState(false);
   const [endingPositionId, setEndingPositionId] = React.useState<string | null>(null);
+  const [logCommOpen, setLogCommOpen] = React.useState(false);
 
   const fetchContact = React.useCallback(() => {
     fetch(`/api/contacts/${id}`)
@@ -85,6 +88,14 @@ export default function ContactDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setLogCommOpen(true)}>
+            <MessageSquare className="h-4 w-4 mr-1" />Log Communication
+          </Button>
+          {(contact.type === "CANDIDATE" || contact.type === "ELECTED_OFFICIAL") && (
+            <Link href={`/endorsements/new?candidateId=${id}`}>
+              <Button variant="outline" size="sm"><Award className="h-4 w-4 mr-1" />Start Endorsement</Button>
+            </Link>
+          )}
           <Link href={`/contacts/${id}/edit`}>
             <Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Edit</Button>
           </Link>
@@ -118,15 +129,24 @@ export default function ContactDetailPage() {
             <Card>
               <CardHeader><CardTitle>Notes</CardTitle></CardHeader>
               <CardContent>
-                <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: contact.notes }} />
+                <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(contact.notes) }} />
               </CardContent>
             </Card>
           )}
 
-          {contact.communications?.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>Communications ({contact.communications.length})</CardTitle></CardHeader>
-              <CardContent>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Communications ({contact.communications?.length || 0})</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setLogCommOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" />Log
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {(!contact.communications || contact.communications.length === 0) ? (
+                <p className="text-sm text-gray-500">No communications logged yet.</p>
+              ) : (
                 <div className="space-y-3">
                   {contact.communications.map((cc: any) => (
                     <Link key={cc.communication.id} href={`/communications/${cc.communication.id}`} className="block rounded-lg border p-3 hover:bg-gray-50">
@@ -138,9 +158,9 @@ export default function ContactDetailPage() {
                     </Link>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">
@@ -326,6 +346,15 @@ export default function ContactDetailPage() {
         onOpenChange={setEndPositionOpen}
         assignmentId={endingPositionId}
         onEnded={fetchContact}
+      />
+
+      <LogCommunicationDialog
+        open={logCommOpen}
+        onOpenChange={setLogCommOpen}
+        contactId={id}
+        contactName={`${contact.firstName} ${contact.lastName}`}
+        endorsements={contact.endorsements || []}
+        onCreated={fetchContact}
       />
     </div>
   );

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { formatDate, formatRelative } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useToast } from "@/hooks/use-toast";
 
 interface Campaign {
   id: string;
@@ -48,8 +49,10 @@ const typeLabels: Record<string, string> = {
 
 export default function CampaignsPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState("");
@@ -58,23 +61,31 @@ export default function CampaignsPage() {
 
   const debouncedSearch = useDebounce(search, 300);
 
-  const fetchCampaigns = React.useCallback(() => {
+  const fetchCampaigns = React.useCallback(async () => {
     setLoading(true);
+    setError(null);
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (statusFilter) params.set("status", statusFilter);
     if (typeFilter) params.set("type", typeFilter);
     params.set("page", page.toString());
 
-    fetch(`/api/campaigns?${params}`)
-      .then((r) => r.json())
-      .then((data) => {
-        setCampaigns(data.campaigns || []);
-        setTotalPages(data.pagination?.totalPages || 1);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [debouncedSearch, statusFilter, typeFilter, page]);
+    try {
+      const res = await fetch(`/api/campaigns?${params}`);
+      if (!res.ok) {
+        throw new Error(res.status === 401 ? "Please log in" : "Failed to load campaigns");
+      }
+      const data = await res.json();
+      setCampaigns(data.campaigns || []);
+      setTotalPages(data.pagination?.totalPages || 1);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An error occurred";
+      setError(message);
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, statusFilter, typeFilter, page, toast]);
 
   React.useEffect(() => {
     fetchCampaigns();
@@ -146,6 +157,11 @@ export default function CampaignsPage() {
       <div className="mt-6 overflow-x-auto">
         {loading ? (
           <p className="text-sm text-gray-500">Loading...</p>
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-red-600">{error}</p>
+            <Button onClick={fetchCampaigns} variant="outline" className="mt-2">Retry</Button>
+          </div>
         ) : campaigns.length === 0 ? (
           <p className="text-sm text-gray-500">
             No campaigns found. Create one to get started.
@@ -182,8 +198,17 @@ export default function CampaignsPage() {
                 {campaigns.map((campaign) => (
                   <tr
                     key={campaign.id}
-                    className="hover:bg-gray-50 cursor-pointer"
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`View campaign: ${campaign.name}`}
+                    className="hover:bg-gray-50 cursor-pointer focus:bg-blue-50 focus:outline-none"
                     onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(`/campaigns/${campaign.id}`);
+                      }
+                    }}
                   >
                     <td className="whitespace-nowrap px-4 py-3">
                       <div>

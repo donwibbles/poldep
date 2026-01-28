@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { PARTIES, US_STATES } from "@/lib/constants";
 
 const CONTACT_TYPES = ["CANDIDATE", "ELECTED_OFFICIAL", "STAFF", "ORGANIZATION"] as const;
-const PARTIES = ["Democratic", "Republican", "Independent", "Green", "Libertarian", "Other", "Nonpartisan"];
 const TAX_STATUSES = [
   { value: "C501C3", label: "501(c)(3) - Charitable" },
   { value: "C501C4", label: "501(c)(4) - Social Welfare" },
@@ -156,7 +156,14 @@ export default function NewContactPage() {
               </div>
               <div>
                 <Label htmlFor="state">State</Label>
-                <Input id="state" name="state" />
+                <Select name="state">
+                  <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                  <SelectContent>
+                    {US_STATES.map((s) => (
+                      <SelectItem key={s.abbr} value={s.abbr}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="zip">ZIP</Label>

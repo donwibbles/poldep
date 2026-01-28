@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { STAFF_ROLES } from "@/lib/constants";
 
 interface StaffAssignmentDialogProps {
   open: boolean;
@@ -145,12 +147,18 @@ export function StaffAssignmentDialog({
 
           <div>
             <Label>Role (optional)</Label>
-            <Input
-              placeholder="e.g., Chief of Staff, Campaign Manager"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              maxLength={200}
-            />
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent>
+                {STAFF_ROLES.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>

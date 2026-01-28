@@ -23,9 +23,16 @@ interface ResendWebhookEvent {
 export async function POST(request: NextRequest) {
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
 
-  // If no webhook secret configured, log but accept (for development)
+  // Require webhook secret in production
   if (!webhookSecret) {
-    console.warn("RESEND_WEBHOOK_SECRET not configured - skipping verification");
+    if (process.env.NODE_ENV === "production") {
+      console.error("RESEND_WEBHOOK_SECRET is required in production");
+      return NextResponse.json(
+        { error: "Webhook verification not configured" },
+        { status: 500 }
+      );
+    }
+    console.warn("RESEND_WEBHOOK_SECRET not configured - skipping verification (development only)");
   }
 
   const body = await request.text();

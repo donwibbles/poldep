@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { previewMailMerge } from "@/lib/mail-merge";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { useDebounce } from "@/hooks/use-debounce";
 
 interface Campaign {
@@ -592,7 +593,7 @@ export default function CampaignDetailPage() {
             <div
               className="prose prose-sm max-w-none border rounded-lg p-4 bg-white"
               dangerouslySetInnerHTML={{
-                __html: previewMailMerge(campaign.body || ""),
+                __html: sanitizeHtml(previewMailMerge(campaign.body || "")),
               }}
             />
           </div>

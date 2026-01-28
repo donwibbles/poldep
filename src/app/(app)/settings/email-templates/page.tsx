@@ -20,6 +20,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getAvailableVariables, previewMailMerge } from "@/lib/mail-merge";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface EmailTemplate {
   id: string;
@@ -310,7 +311,7 @@ export default function EmailTemplatesPage() {
                   <div
                     className="prose prose-sm max-w-none"
                     dangerouslySetInnerHTML={{
-                      __html: previewMailMerge(formBody),
+                      __html: sanitizeHtml(previewMailMerge(formBody)),
                     }}
                   />
                 </div>
@@ -379,7 +380,7 @@ export default function EmailTemplatesPage() {
               <div
                 className="prose prose-sm max-w-none border rounded-lg p-4 bg-white"
                 dangerouslySetInnerHTML={{
-                  __html: previewMailMerge(previewTemplate.body),
+                  __html: sanitizeHtml(previewMailMerge(previewTemplate.body)),
                 }}
               />
             </div>

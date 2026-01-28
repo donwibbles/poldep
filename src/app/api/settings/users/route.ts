@@ -5,7 +5,7 @@ import { logActivity } from "@/lib/activity";
 import { createUserSchema } from "@/lib/validations/user";
 
 export async function GET(request: NextRequest) {
-  const { session, error } = await requireAuthApi();
+  const { session, error } = await requireAdminApi();
   if (error) return error;
 
   const users = await prisma.user.findMany({

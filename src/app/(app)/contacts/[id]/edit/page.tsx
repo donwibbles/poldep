@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { PARTIES, US_STATES } from "@/lib/constants";
 
 const CONTACT_TYPES = ["CANDIDATE", "ELECTED_OFFICIAL", "STAFF", "ORGANIZATION"] as const;
-const PARTIES = ["Democratic", "Republican", "Independent", "Green", "Libertarian", "Other", "Nonpartisan"];
 const TAX_STATUSES = [
   { value: "C501C3", label: "501(c)(3) - Charitable" },
   { value: "C501C4", label: "501(c)(4) - Social Welfare" },
@@ -120,7 +120,13 @@ export default function EditContactPage() {
             <div><Label>Address</Label><Input name="address" defaultValue={contact.address || ""} /></div>
             <div className="grid gap-4 sm:grid-cols-3">
               <div><Label>City</Label><Input name="city" defaultValue={contact.city || ""} /></div>
-              <div><Label>State</Label><Input name="state" defaultValue={contact.state || ""} /></div>
+              <div>
+                <Label>State</Label>
+                <Select name="state" defaultValue={contact.state || ""}>
+                  <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                  <SelectContent>{US_STATES.map((s) => <SelectItem key={s.abbr} value={s.abbr}>{s.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
               <div><Label>ZIP</Label><Input name="zip" defaultValue={contact.zip || ""} /></div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">

@@ -22,7 +22,7 @@ interface Subscriber {
   userId: string | null;
 }
 
-export default function DigestSubscribersPage() {
+export default function DigestRecipientsPage() {
   const { toast } = useToast();
   const [subscribers, setSubscribers] = React.useState<Subscriber[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -130,7 +130,7 @@ export default function DigestSubscribersPage() {
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Digest Subscribers</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Digest Recipients</h1>
         <Button onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />Add External
         </Button>
@@ -143,7 +143,7 @@ export default function DigestSubscribersPage() {
         {loading ? (
           <p className="text-sm text-gray-500">Loading...</p>
         ) : subscribers.length === 0 ? (
-          <p className="text-sm text-gray-500">No digest subscribers yet.</p>
+          <p className="text-sm text-gray-500">No digest recipients yet.</p>
         ) : (
           subscribers.map((subscriber) => (
             <Card key={subscriber.id}>

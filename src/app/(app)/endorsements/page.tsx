@@ -8,26 +8,43 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 type ViewMode = "kanban" | "table";
 
 export default function EndorsementsPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [endorsements, setEndorsements] = React.useState<any[]>([]);
   const [stages, setStages] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [view, setView] = React.useState<ViewMode>("kanban");
 
-  React.useEffect(() => {
-    Promise.all([
-      fetch("/api/endorsements?limit=200").then((r) => r.json()),
-      fetch("/api/pipeline-stages").then((r) => r.json()),
-    ]).then(([eData, sData]) => {
+  const fetchData = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [eRes, sRes] = await Promise.all([
+        fetch("/api/endorsements?limit=200"),
+        fetch("/api/pipeline-stages"),
+      ]);
+      if (!eRes.ok || !sRes.ok) {
+        throw new Error("Failed to load data");
+      }
+      const [eData, sData] = await Promise.all([eRes.json(), sRes.json()]);
       setEndorsements(eData.endorsements || []);
       setStages(sData.stages || []);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An error occurred";
+      setError(message);
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
       setLoading(false);
-    });
-  }, []);
+    }
+  }, [toast]);
+
+  React.useEffect(() => { fetchData(); }, [fetchData]);
 
   const endorsementsByStage = React.useMemo(() => {
     const map: Record<string, any[]> = {};
@@ -39,6 +56,15 @@ export default function EndorsementsPage() {
   }, [endorsements, stages]);
 
   if (loading) return <p className="text-sm text-gray-500">Loading...</p>;
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-600">{error}</p>
+        <Button onClick={fetchData} variant="outline" className="mt-2">Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -91,7 +117,20 @@ export default function EndorsementsPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {endorsements.map((e) => (
-                <tr key={e.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/endorsements/${e.id}`)}>
+                <tr
+                  key={e.id}
+                  tabIndex={0}
+                  role="link"
+                  aria-label={`View endorsement for ${e.candidate?.firstName} ${e.candidate?.lastName}`}
+                  className="hover:bg-gray-50 cursor-pointer focus:bg-blue-50 focus:outline-none"
+                  onClick={() => router.push(`/endorsements/${e.id}`)}
+                  onKeyDown={(ev) => {
+                    if (ev.key === "Enter" || ev.key === " ") {
+                      ev.preventDefault();
+                      router.push(`/endorsements/${e.id}`);
+                    }
+                  }}
+                >
                   <td className="whitespace-nowrap px-4 py-3 text-sm font-medium">{e.candidate?.firstName} {e.candidate?.lastName}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{e.race?.office}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm">

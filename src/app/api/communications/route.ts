@@ -13,8 +13,9 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const type = searchParams.get("type") || "";
   const contactId = searchParams.get("contactId") || "";
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "25");
+  const MAX_LIMIT = 100;
+  const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
+  const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "25"), 1), MAX_LIMIT);
   const skip = (page - 1) * limit;
 
   const where: any = {};

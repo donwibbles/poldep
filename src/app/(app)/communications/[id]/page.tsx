@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 export default function CommunicationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -54,7 +55,7 @@ export default function CommunicationDetailPage() {
           {comm.notes && (
             <Card>
               <CardHeader><CardTitle>Notes</CardTitle></CardHeader>
-              <CardContent><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: comm.notes }} /></CardContent>
+              <CardContent><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(comm.notes) }} /></CardContent>
             </Card>
           )}
         </div>

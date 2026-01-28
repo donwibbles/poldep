@@ -29,6 +29,18 @@ export async function GET(
       },
       tasks: { orderBy: { dueDate: "asc" } },
       attachments: { orderBy: { createdAt: "desc" } },
+      previousEndorsement: {
+        include: {
+          race: { include: { election: true } },
+        },
+      },
+      reEndorsements: {
+        include: {
+          race: { include: { election: true } },
+          currentStage: true,
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 

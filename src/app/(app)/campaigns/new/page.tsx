@@ -17,6 +17,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { getAvailableVariables, previewMailMerge } from "@/lib/mail-merge";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface EmailTemplate {
   id: string;
@@ -192,7 +193,7 @@ export default function NewCampaignPage() {
                   <div
                     className="prose prose-sm max-w-none"
                     dangerouslySetInnerHTML={{
-                      __html: previewMailMerge(body),
+                      __html: sanitizeHtml(previewMailMerge(body)),
                     }}
                   />
                 </div>
