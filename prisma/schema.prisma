@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum ContactType {
+  CANDIDATE
+  ELECTED_OFFICIAL
+  STAFF
+  ORGANIZATION
+}
+
+enum CommunicationType {
+  PHONE_CALL
+  MEETING_IN_PERSON
+  MEETING_VIRTUAL
+  EMAIL
+  LETTER_MAILER
+  EVENT_ACTION
+}
+
+enum EndorsementDecision {
+  PENDING
+  ENDORSED
+  NOT_ENDORSED
+  NO_ENDORSEMENT
+}
+
+enum ElectionType {
+  PRIMARY
+  GENERAL
+  SPECIAL
+}
+
+enum TaskStatus {
+  PENDING
+  DONE
+}
+
+enum DigestFrequency {
+  DAILY
+  WEEKLY
+  NONE
+}
+
+model User {
+  id                  String   @id @default(cuid())
+  email               String   @unique
+  name                String
+  passwordHash        String
+  role                Role     @default(MEMBER)
+  failedLoginAttempts Int      @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  endorsements     Endorsement[]
+  tasks            Task[]
+  activityLogs     ActivityLog[]
+  digestPreference DigestPreference?
+}
+
+model Contact {
+  id              String      @id @default(cuid())
+  type            ContactType
+  firstName       String
+  lastName        String
+  title           String?
+  organization    String?
+  phone           String?
+  email           String?
+  address         String?
+  city            String?
+  state           String?
+  zip             String?
+  district        String?
+  party           String?
+  website         String?
+  twitter         String?
+  facebook        String?
+  instagram       String?
+  tags            String[]
+  notes           String?
+  parentContactId String?
+  parentContact   Contact?  @relation("ContactStaff", fields: [parentContactId], references: [id], onDelete: SetNull)
+  staffMembers    Contact[] @relation("ContactStaff")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  communications CommunicationContact[]
+  endorsements   Endorsement[]
+  raceCandidates RaceCandidate[]
+  tasks          Task[]
+  attachments    Attachment[]
+
+  @@index([lastName, firstName])
+  @@index([tags], type: Gin)
+}
+
+model Communication {
+  id            String            @id @default(cuid())
+  type          CommunicationType
+  date          DateTime
+  subject       String
+  notes         String?
+  followUpDate  DateTime?
+  endorsementId String?
+  endorsement   Endorsement?      @relation(fields: [endorsementId], references: [id], onDelete: SetNull)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  contacts    CommunicationContact[]
+  attachments Attachment[]
+}
+
+model CommunicationContact {
+  communicationId String
+  contactId       String
+  communication   Communication @relation(fields: [communicationId], references: [id], onDelete: Cascade)
+  contact         Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@id([communicationId, contactId])
+}
+
+model PipelineStage {
+  id      String  @id @default(cuid())
+  name    String
+  order   Int     @unique
+  isFinal Boolean @default(false)
+  color   String  @default("#6B7280")
+
+  endorsements         Endorsement[]
+  endorsementHistories EndorsementStageHistory[]
+}
+
+model Endorsement {
+  id             String              @id @default(cuid())
+  decision       EndorsementDecision @default(PENDING)
+  candidateId    String
+  candidate      Contact             @relation(fields: [candidateId], references: [id])
+  raceId         String
+  race           Race                @relation(fields: [raceId], references: [id])
+  currentStageId String
+  currentStage   PipelineStage       @relation(fields: [currentStageId], references: [id])
+  assignedToId   String?
+  assignedTo     User?               @relation(fields: [assignedToId], references: [id])
+  notes          String?
+  lockedAt       DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  stageHistory   EndorsementStageHistory[]
+  communications Communication[]
+  tasks          Task[]
+  attachments    Attachment[]
+}
+
+model EndorsementStageHistory {
+  id            String        @id @default(cuid())
+  endorsementId String
+  endorsement   Endorsement   @relation(fields: [endorsementId], references: [id], onDelete: Cascade)
+  stageId       String
+  stage         PipelineStage @relation(fields: [stageId], references: [id])
+  enteredAt     DateTime      @default(now())
+  exitedAt      DateTime?
+  notes         String?
+}
+
+model Election {
+  id        String       @id @default(cuid())
+  name      String
+  type      ElectionType
+  date      DateTime
+  cycle     String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  races Race[]
+}
+
+model Race {
+  id         String   @id @default(cuid())
+  office     String
+  district   String?
+  electionId String
+  election   Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  candidates   RaceCandidate[]
+  endorsements Endorsement[]
+
+  @@unique([office, district, electionId])
+}
+
+model RaceCandidate {
+  raceId      String
+  contactId   String
+  isIncumbent Boolean @default(false)
+  race        Race    @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  contact     Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@id([raceId, contactId])
+}
+
+model Task {
+  id            String       @id @default(cuid())
+  title         String
+  description   String?
+  dueDate       DateTime?
+  status        TaskStatus   @default(PENDING)
+  assignedToId  String?
+  assignedTo    User?        @relation(fields: [assignedToId], references: [id])
+  contactId     String?
+  contact       Contact?     @relation(fields: [contactId], references: [id])
+  endorsementId String?
+  endorsement   Endorsement? @relation(fields: [endorsementId], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Attachment {
+  id              String         @id @default(cuid())
+  fileName        String
+  fileKey         String
+  fileSize        Int
+  mimeType        String
+  contactId       String?
+  contact         Contact?       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  communicationId String?
+  communication   Communication? @relation(fields: [communicationId], references: [id], onDelete: Cascade)
+  endorsementId   String?
+  endorsement     Endorsement?   @relation(fields: [endorsementId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now())
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  summary    String
+  metadata   Json?
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model DigestPreference {
+  id        String          @id @default(cuid())
+  frequency DigestFrequency @default(NONE)
+  userId    String          @unique
+  user      User            @relation(fields: [userId], references: [id])
+}
