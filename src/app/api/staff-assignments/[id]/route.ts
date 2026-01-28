@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuthApi } from "@/lib/auth-helpers";
 import { logActivity } from "@/lib/activity";
-import { endStaffAssignmentSchema } from "@/lib/validations/staff-assignment";
+import { updateStaffAssignmentSchema } from "@/lib/validations/staff-assignment";
 
 export async function PATCH(
   request: NextRequest,
@@ -13,7 +13,7 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
-  const parsed = endStaffAssignmentSchema.safeParse(body);
+  const parsed = updateStaffAssignmentSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
@@ -24,23 +24,30 @@ export async function PATCH(
     return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
   }
 
+  const updateData: { role?: string | null; endDate?: Date; notes?: string | null } = {};
+  if (parsed.data.role !== undefined) updateData.role = parsed.data.role;
+  if (parsed.data.endDate !== undefined) updateData.endDate = parsed.data.endDate;
+  if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes;
+
   const assignment = await prisma.staffAssignment.update({
     where: { id },
-    data: {
-      endDate: parsed.data.endDate,
-      notes: parsed.data.notes !== undefined ? parsed.data.notes : existing.notes,
-    },
+    data: updateData,
     include: {
       staffContact: { select: { id: true, firstName: true, lastName: true } },
       parentContact: { select: { id: true, firstName: true, lastName: true } },
     },
   });
 
+  const isEnding = parsed.data.endDate !== undefined;
+  const summary = isEnding
+    ? `Ended assignment of ${assignment.staffContact.firstName} ${assignment.staffContact.lastName} from ${assignment.parentContact.firstName} ${assignment.parentContact.lastName}`
+    : `Updated assignment of ${assignment.staffContact.firstName} ${assignment.staffContact.lastName} to ${assignment.parentContact.firstName} ${assignment.parentContact.lastName}`;
+
   await logActivity({
     action: "UPDATE",
     entityType: "StaffAssignment",
     entityId: assignment.id,
-    summary: `Ended assignment of ${assignment.staffContact.firstName} ${assignment.staffContact.lastName} from ${assignment.parentContact.firstName} ${assignment.parentContact.lastName}`,
+    summary,
     userId: session!.user.id,
   });
 

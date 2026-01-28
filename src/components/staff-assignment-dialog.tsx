@@ -28,6 +28,7 @@ export function StaffAssignmentDialog({
   const [results, setResults] = React.useState<any[]>([]);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [selectedName, setSelectedName] = React.useState("");
+  const [role, setRole] = React.useState("");
   const [startDate, setStartDate] = React.useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = React.useState("");
   const [saving, setSaving] = React.useState(false);
@@ -41,6 +42,7 @@ export function StaffAssignmentDialog({
       setResults([]);
       setSelectedId(null);
       setSelectedName("");
+      setRole("");
       setStartDate(new Date().toISOString().split("T")[0]);
       setNotes("");
     }
@@ -73,8 +75,8 @@ export function StaffAssignmentDialog({
     setSaving(true);
 
     const body = isStaff
-      ? { staffContactId: contactId, parentContactId: selectedId, startDate: new Date(startDate), notes: notes || null }
-      : { staffContactId: selectedId, parentContactId: contactId, startDate: new Date(startDate), notes: notes || null };
+      ? { staffContactId: contactId, parentContactId: selectedId, role: role || null, startDate: new Date(startDate), notes: notes || null }
+      : { staffContactId: selectedId, parentContactId: contactId, role: role || null, startDate: new Date(startDate), notes: notes || null };
 
     const res = await fetch("/api/staff-assignments", {
       method: "POST",
@@ -139,6 +141,16 @@ export function StaffAssignmentDialog({
                 </button>
               </div>
             )}
+          </div>
+
+          <div>
+            <Label>Role (optional)</Label>
+            <Input
+              placeholder="e.g., Chief of Staff, Campaign Manager"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              maxLength={200}
+            />
           </div>
 
           <div>

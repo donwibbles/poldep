@@ -177,9 +177,12 @@ export default function ContactDetailPage() {
                     return (
                       <div key={a.id} className="rounded-lg border p-3">
                         <div className="flex items-center justify-between">
-                          <Link href={`/contacts/${linkedContact.id}`} className="text-sm font-medium text-blue-600 hover:underline">
-                            {linkedContact.firstName} {linkedContact.lastName}
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Link href={`/contacts/${linkedContact.id}`} className="text-sm font-medium text-blue-600 hover:underline">
+                              {linkedContact.firstName} {linkedContact.lastName}
+                            </Link>
+                            {a.role && <span className="text-sm text-gray-500">({a.role})</span>}
+                          </div>
                           <div className="flex items-center gap-2">
                             <Badge variant={isActive ? "success" : "secondary"} className="text-xs">
                               {isActive ? "Active" : "Ended"}

@@ -134,6 +134,7 @@ model StaffAssignment {
   staffContact    Contact   @relation("StaffAssignments", fields: [staffContactId], references: [id], onDelete: Cascade)
   parentContactId String
   parentContact   Contact   @relation("ParentAssignments", fields: [parentContactId], references: [id], onDelete: Cascade)
+  role            String?
   startDate       DateTime  @default(now())
   endDate         DateTime?
   notes           String?
@@ -313,4 +314,16 @@ model PositionAssignment {
   createdAt     DateTime  @default(now())
 
   @@index([contactId])
+}
+
+model DigestSubscriber {
+  id        String          @id @default(cuid())
+  email     String          @unique
+  name      String
+  frequency DigestFrequency @default(WEEKLY)
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([frequency, isActive])
 }

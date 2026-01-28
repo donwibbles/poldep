@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { staffContactId, parentContactId, startDate, notes } = parsed.data;
+  const { staffContactId, parentContactId, role, startDate, notes } = parsed.data;
 
   if (staffContactId === parentContactId) {
     return NextResponse.json({ error: "A contact cannot be assigned to itself" }, { status: 400 });
@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
     data: {
       staffContactId,
       parentContactId,
+      role,
       startDate: startDate || new Date(),
       notes,
     },
@@ -61,11 +62,12 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  const roleSuffix = assignment.role ? ` as ${assignment.role}` : "";
   await logActivity({
     action: "CREATE",
     entityType: "StaffAssignment",
     entityId: assignment.id,
-    summary: `Assigned ${assignment.staffContact.firstName} ${assignment.staffContact.lastName} to ${assignment.parentContact.firstName} ${assignment.parentContact.lastName}`,
+    summary: `Assigned ${assignment.staffContact.firstName} ${assignment.staffContact.lastName}${roleSuffix} to ${assignment.parentContact.firstName} ${assignment.parentContact.lastName}`,
     userId: session!.user.id,
   });
 

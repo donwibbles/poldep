@@ -22,13 +22,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid frequency. Use DAILY or WEEKLY." }, { status: 400 });
   }
 
-  const users = await prisma.digestPreference.findMany({
+  // Get user subscribers
+  const userPreferences = await prisma.digestPreference.findMany({
     where: { frequency },
     include: { user: true },
   });
 
-  if (users.length === 0) {
-    return NextResponse.json({ message: "No users subscribed to this digest frequency." });
+  // Get external subscribers (active only)
+  const externalSubscribers = await prisma.digestSubscriber.findMany({
+    where: { frequency, isActive: true },
+  });
+
+  // Combine into unified recipient list
+  const recipients = [
+    ...userPreferences.map((pref) => ({
+      email: pref.user.email,
+      name: pref.user.name,
+      source: "user" as const,
+    })),
+    ...externalSubscribers.map((sub) => ({
+      email: sub.email,
+      name: sub.name,
+      source: "external" as const,
+    })),
+  ];
+
+  if (recipients.length === 0) {
+    return NextResponse.json({ message: "No subscribers for this digest frequency." });
   }
 
   const now = new Date();
@@ -83,18 +103,18 @@ export async function POST(request: NextRequest) {
   });
 
   const results = [];
-  for (const pref of users) {
+  for (const recipient of recipients) {
     try {
       await getResend().emails.send({
         from: "UFW CRM <info@bigperro.dev>",
-        to: pref.user.email,
+        to: recipient.email,
         subject: `UFW CRM ${frequency.toLowerCase()} digest - ${format(now, "MMM d, yyyy")}`,
         html: htmlBody,
         text: emailBody,
       });
-      results.push({ email: pref.user.email, status: "sent" });
+      results.push({ email: recipient.email, source: recipient.source, status: "sent" });
     } catch (err) {
-      results.push({ email: pref.user.email, status: "failed" });
+      results.push({ email: recipient.email, source: recipient.source, status: "failed" });
     }
   }
 
