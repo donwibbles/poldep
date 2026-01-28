@@ -65,6 +65,19 @@ enum DigestFrequency {
   NONE
 }
 
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  PAUSED
+}
+
+enum CampaignType {
+  ONE_TIME
+  DRIP_SEQUENCE
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -326,4 +339,107 @@ model DigestSubscriber {
   updatedAt DateTime        @updatedAt
 
   @@index([frequency, isActive])
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  subject   String
+  body      String   // HTML content with {{variables}}
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaigns     Campaign[]
+  sequenceSteps SequenceStep[]
+}
+
+model Campaign {
+  id     String         @id @default(cuid())
+  name   String
+  type   CampaignType   @default(ONE_TIME)
+  status CampaignStatus @default(DRAFT)
+
+  // For ONE_TIME campaigns
+  templateId String?
+  template   EmailTemplate? @relation(fields: [templateId], references: [id])
+  subject    String?        // Can override template subject
+  body       String?        // Can override template body
+
+  scheduledAt DateTime? // When to send (null = immediate when triggered)
+  sentAt      DateTime? // When actually sent
+
+  // Stats (denormalized for quick access)
+  totalRecipients Int @default(0)
+  totalSent       Int @default(0)
+  totalOpened     Int @default(0)
+  totalClicked    Int @default(0)
+  totalBounced    Int @default(0)
+  totalReplied    Int @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String
+
+  recipients    CampaignRecipient[]
+  sequenceSteps SequenceStep[]
+  emailEvents   EmailEvent[]
+
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model SequenceStep {
+  id         String        @id @default(cuid())
+  campaignId String
+  campaign   Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  templateId String
+  template   EmailTemplate @relation(fields: [templateId], references: [id])
+  subject    String?       // Override template subject
+  body       String?       // Override template body
+  delayDays  Int           // Days after previous step (0 for first step)
+  stepOrder  Int           // Order in sequence
+  createdAt  DateTime      @default(now())
+
+  @@index([campaignId, stepOrder])
+}
+
+model CampaignRecipient {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId  String
+  email      String   // Snapshot of email at send time
+
+  // For drip sequences: track progress
+  currentStep Int       @default(0)
+  nextSendAt  DateTime?
+
+  // Status per recipient
+  sentAt    DateTime?
+  openedAt  DateTime?
+  clickedAt DateTime?
+  bouncedAt DateTime?
+  repliedAt DateTime?
+
+  resendId String? // Resend message ID for tracking
+
+  createdAt DateTime @default(now())
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId])
+  @@index([nextSendAt])
+}
+
+model EmailEvent {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  resendId   String   // Resend message ID
+  eventType  String   // delivered, opened, clicked, bounced, complained, replied
+  metadata   Json?    // Link clicked, etc.
+  createdAt  DateTime @default(now())
+
+  @@index([campaignId])
+  @@index([resendId])
 }
