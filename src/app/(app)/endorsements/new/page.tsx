@@ -27,7 +27,7 @@ function NewEndorsementForm() {
 
   React.useEffect(() => {
     Promise.all([
-      fetch("/api/contacts?type=CANDIDATE&limit=200").then((r) => r.json()),
+      fetch("/api/contacts?limit=200").then((r) => r.json()),
       fetch("/api/races").then((r) => r.json()),
       fetch("/api/pipeline-stages").then((r) => r.json()),
       fetch("/api/settings/users").then((r) => r.json()).catch(() => ({ users: [] })),
