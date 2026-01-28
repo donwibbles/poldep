@@ -323,7 +323,13 @@ export default function ContactDetailPage() {
                   {contact.endorsements.map((e: any) => (
                     <li key={e.id}>
                       <Link href={`/endorsements/${e.id}`} className="block rounded border p-2 hover:bg-gray-50">
-                        <p className="text-sm font-medium">{e.race?.office}</p>
+                        <p className="text-sm font-medium">
+                          {e.race?.office}
+                          {e.race?.district && ` - ${e.race.district}`}
+                        </p>
+                        {e.race?.election && (
+                          <p className="text-xs text-gray-500">{e.race.election.name}</p>
+                        )}
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="outline" className="text-xs" style={{ borderColor: e.currentStage?.color }}>
                             {e.currentStage?.name}
