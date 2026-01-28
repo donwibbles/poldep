@@ -53,6 +53,9 @@ export async function GET(
       attachments: {
         orderBy: { createdAt: "desc" },
       },
+      positionAssignments: {
+        orderBy: { startDate: "desc" },
+      },
     },
   });
 

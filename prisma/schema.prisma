@@ -27,6 +27,18 @@ enum CommunicationType {
   EMAIL
   LETTER_MAILER
   EVENT_ACTION
+  TEXT
+  LEFT_VOICEMAIL
+}
+
+enum TaxStatus {
+  C501C3
+  C501C4
+  C501C5
+  C501C6
+  FOR_PROFIT
+  GOVERNMENT
+  OTHER
 }
 
 enum EndorsementDecision {
@@ -99,16 +111,18 @@ model Contact {
   instagram       String?
   tags            String[]
   notes           String?
+  taxStatus       TaxStatus?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  communications     CommunicationContact[]
-  endorsements       Endorsement[]
-  raceCandidates     RaceCandidate[]
-  tasks              Task[]
-  attachments        Attachment[]
-  staffAssignments   StaffAssignment[] @relation("StaffAssignments")
-  parentAssignments  StaffAssignment[] @relation("ParentAssignments")
+  communications      CommunicationContact[]
+  endorsements        Endorsement[]
+  raceCandidates      RaceCandidate[]
+  tasks               Task[]
+  attachments         Attachment[]
+  staffAssignments    StaffAssignment[] @relation("StaffAssignments")
+  parentAssignments   StaffAssignment[] @relation("ParentAssignments")
+  positionAssignments PositionAssignment[]
 
   @@index([lastName, firstName])
   @@index([tags], type: Gin)
@@ -285,4 +299,18 @@ model DigestPreference {
   frequency DigestFrequency @default(NONE)
   userId    String          @unique
   user      User            @relation(fields: [userId], references: [id])
+}
+
+model PositionAssignment {
+  id            String    @id @default(cuid())
+  contactId     String
+  contact       Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  positionTitle String
+  jurisdiction  String?
+  startDate     DateTime  @default(now())
+  endDate       DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+
+  @@index([contactId])
 }

@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { requireAuthApi } from "@/lib/auth-helpers";
 import { logActivity } from "@/lib/activity";
 import { taskSchema } from "@/lib/validations/task";
+import { getResend } from "@/lib/resend";
+import { buildTaskAssignmentHtml, buildTaskAssignmentText } from "@/lib/email-templates/task-assignment";
 
 export async function GET(request: NextRequest) {
   const { session, error } = await requireAuthApi();
@@ -54,7 +56,7 @@ export async function POST(request: NextRequest) {
 
   const task = await prisma.task.create({
     data: parsed.data,
-    include: { assignedTo: { select: { id: true, name: true } } },
+    include: { assignedTo: { select: { id: true, name: true, email: true } } },
   });
 
   await logActivity({
@@ -64,6 +66,34 @@ export async function POST(request: NextRequest) {
     summary: `Created task: ${task.title}`,
     userId: session!.user.id,
   });
+
+  // Send email notification if task is assigned to someone other than creator
+  if (task.assignedToId && task.assignedToId !== session!.user.id && task.assignedTo?.email) {
+    try {
+      const assigner = await prisma.user.findUnique({ where: { id: session!.user.id }, select: { name: true } });
+      await getResend().emails.send({
+        from: "UFW CRM <info@bigperro.dev>",
+        to: task.assignedTo.email,
+        subject: `Task assigned: ${task.title}`,
+        html: buildTaskAssignmentHtml({
+          taskTitle: task.title,
+          taskDescription: task.description,
+          dueDate: task.dueDate,
+          assignerName: assigner?.name || "Someone",
+          assigneeName: task.assignedTo.name,
+        }),
+        text: buildTaskAssignmentText({
+          taskTitle: task.title,
+          taskDescription: task.description,
+          dueDate: task.dueDate,
+          assignerName: assigner?.name || "Someone",
+          assigneeName: task.assignedTo.name,
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to send task assignment email:", err);
+    }
+  }
 
   return NextResponse.json(task, { status: 201 });
 }

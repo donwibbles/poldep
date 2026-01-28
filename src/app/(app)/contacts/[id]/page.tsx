@@ -3,15 +3,27 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Globe, Plus, XCircle } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Globe, Plus, XCircle, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { StaffAssignmentDialog } from "@/components/staff-assignment-dialog";
 import { EndAssignmentDialog } from "@/components/end-assignment-dialog";
+import { PositionAssignmentDialog } from "@/components/position-assignment-dialog";
+import { EndPositionDialog } from "@/components/end-position-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/utils";
+
+const TAX_STATUS_LABELS: Record<string, string> = {
+  C501C3: "501(c)(3)",
+  C501C4: "501(c)(4)",
+  C501C5: "501(c)(5)",
+  C501C6: "501(c)(6)",
+  FOR_PROFIT: "For-Profit",
+  GOVERNMENT: "Government",
+  OTHER: "Other",
+};
 
 export default function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +36,9 @@ export default function ContactDetailPage() {
   const [assignOpen, setAssignOpen] = React.useState(false);
   const [endOpen, setEndOpen] = React.useState(false);
   const [endingAssignmentId, setEndingAssignmentId] = React.useState<string | null>(null);
+  const [positionOpen, setPositionOpen] = React.useState(false);
+  const [endPositionOpen, setEndPositionOpen] = React.useState(false);
+  const [endingPositionId, setEndingPositionId] = React.useState<string | null>(null);
 
   const fetchContact = React.useCallback(() => {
     fetch(`/api/contacts/${id}`)
@@ -94,6 +109,7 @@ export default function ContactDetailPage() {
                 )}
                 {contact.district && <div><dt className="text-sm text-gray-500">District</dt><dd className="text-sm font-medium">{contact.district}</dd></div>}
                 {contact.website && <div><dt className="text-sm text-gray-500">Website</dt><dd className="text-sm font-medium"><a href={contact.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1"><Globe className="h-3 w-3" />{contact.website}</a></dd></div>}
+                {contact.taxStatus && <div><dt className="text-sm text-gray-500">Tax Status</dt><dd className="text-sm font-medium">{TAX_STATUS_LABELS[contact.taxStatus] || contact.taxStatus}</dd></div>}
               </dl>
             </CardContent>
           </Card>
@@ -192,6 +208,59 @@ export default function ContactDetailPage() {
             </CardContent>
           </Card>
 
+          {(contact.type === "CANDIDATE" || contact.type === "ELECTED_OFFICIAL") && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Positions ({contact.positionAssignments?.length || 0})</CardTitle>
+                  <Button variant="outline" size="sm" onClick={() => setPositionOpen(true)}>
+                    <Briefcase className="h-4 w-4 mr-1" />Add
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {(!contact.positionAssignments || contact.positionAssignments.length === 0) ? (
+                  <p className="text-sm text-gray-500">No positions recorded.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {contact.positionAssignments.map((p: any) => {
+                      const isActive = !p.endDate;
+                      return (
+                        <div key={p.id} className="rounded-lg border p-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-sm font-medium">{p.positionTitle}</span>
+                              {p.jurisdiction && <span className="text-sm text-gray-500 ml-1">({p.jurisdiction})</span>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={isActive ? "success" : "secondary"} className="text-xs">
+                                {isActive ? "Active" : "Ended"}
+                              </Badge>
+                              {isActive && (
+                                <button
+                                  className="text-gray-400 hover:text-red-500"
+                                  title="End position"
+                                  onClick={() => { setEndingPositionId(p.id); setEndPositionOpen(true); }}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {formatDate(p.startDate)}
+                            {p.endDate ? ` – ${formatDate(p.endDate)}` : " – Present"}
+                          </p>
+                          {p.notes && <p className="text-xs text-gray-400 mt-1">{p.notes}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {contact.endorsements?.length > 0 && (
             <Card>
               <CardHeader><CardTitle>Endorsements</CardTitle></CardHeader>
@@ -239,6 +308,20 @@ export default function ContactDetailPage() {
         open={endOpen}
         onOpenChange={setEndOpen}
         assignmentId={endingAssignmentId}
+        onEnded={fetchContact}
+      />
+
+      <PositionAssignmentDialog
+        open={positionOpen}
+        onOpenChange={setPositionOpen}
+        contactId={id}
+        onCreated={fetchContact}
+      />
+
+      <EndPositionDialog
+        open={endPositionOpen}
+        onOpenChange={setEndPositionOpen}
+        assignmentId={endingPositionId}
         onEnded={fetchContact}
       />
     </div>

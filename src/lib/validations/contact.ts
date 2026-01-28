@@ -20,6 +20,7 @@ export const contactSchema = z.object({
   instagram: z.string().max(100).optional().nullable(),
   tags: z.array(z.string().max(50)).max(20).default([]),
   notes: z.string().optional().nullable(),
+  taxStatus: z.enum(["C501C3", "C501C4", "C501C5", "C501C6", "FOR_PROFIT", "GOVERNMENT", "OTHER"]).optional().nullable(),
 });
 
 export type ContactFormData = z.infer<typeof contactSchema>;

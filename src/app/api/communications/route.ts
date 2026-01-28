@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { requireAuthApi } from "@/lib/auth-helpers";
 import { logActivity } from "@/lib/activity";
 import { communicationSchema } from "@/lib/validations/communication";
+import { getResend } from "@/lib/resend";
+import { buildTaskAssignmentHtml, buildTaskAssignmentText } from "@/lib/email-templates/task-assignment";
 
 export async function GET(request: NextRequest) {
   const { session, error } = await requireAuthApi();
@@ -52,7 +54,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { contactIds, ...data } = parsed.data;
+  const { contactIds, createFollowUpTask, assignTaskToId, ...data } = parsed.data;
 
   const communication = await prisma.communication.create({
     data: {
@@ -73,6 +75,58 @@ export async function POST(request: NextRequest) {
     summary: `Created ${communication.type.toLowerCase().replace(/_/g, " ")}: ${communication.subject}`,
     userId: session!.user.id,
   });
+
+  // Create follow-up task if requested
+  if (createFollowUpTask && communication.followUpDate) {
+    const taskAssigneeId = assignTaskToId || session!.user.id;
+    const firstContactId = contactIds[0] || null;
+
+    const task = await prisma.task.create({
+      data: {
+        title: `Follow-up: ${communication.subject}`,
+        dueDate: communication.followUpDate,
+        contactId: firstContactId,
+        assignedToId: taskAssigneeId,
+      },
+      include: { assignedTo: { select: { id: true, name: true, email: true } } },
+    });
+
+    await logActivity({
+      action: "CREATE",
+      entityType: "Task",
+      entityId: task.id,
+      summary: `Created follow-up task: ${task.title}`,
+      userId: session!.user.id,
+    });
+
+    // Send email if assigned to someone else
+    if (taskAssigneeId !== session!.user.id && task.assignedTo?.email) {
+      try {
+        const assigner = await prisma.user.findUnique({ where: { id: session!.user.id }, select: { name: true } });
+        await getResend().emails.send({
+          from: "UFW CRM <info@bigperro.dev>",
+          to: task.assignedTo.email,
+          subject: `Task assigned: ${task.title}`,
+          html: buildTaskAssignmentHtml({
+            taskTitle: task.title,
+            taskDescription: task.description,
+            dueDate: task.dueDate,
+            assignerName: assigner?.name || "Someone",
+            assigneeName: task.assignedTo.name,
+          }),
+          text: buildTaskAssignmentText({
+            taskTitle: task.title,
+            taskDescription: task.description,
+            dueDate: task.dueDate,
+            assignerName: assigner?.name || "Someone",
+            assigneeName: task.assignedTo.name,
+          }),
+        });
+      } catch (err) {
+        console.error("Failed to send task assignment email:", err);
+      }
+    }
+  }
 
   return NextResponse.json(communication, { status: 201 });
 }

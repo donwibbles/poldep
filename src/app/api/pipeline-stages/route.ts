@@ -28,7 +28,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const stage = await prisma.pipelineStage.create({ data: parsed.data });
+  // Auto-calculate next order to avoid unique constraint violation
+  const maxOrder = await prisma.pipelineStage.aggregate({ _max: { order: true } });
+  const nextOrder = (maxOrder._max.order ?? -1) + 1;
+
+  const stage = await prisma.pipelineStage.create({
+    data: { ...parsed.data, order: nextOrder },
+  });
 
   await logActivity({
     action: "CREATE",

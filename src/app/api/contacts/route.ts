@@ -49,6 +49,16 @@ export async function GET(request: NextRequest) {
             parentAssignments: true,
           },
         },
+        staffAssignments: {
+          where: { endDate: null },
+          take: 1,
+          include: { parentContact: { select: { id: true, firstName: true, lastName: true } } },
+        },
+        positionAssignments: {
+          where: { endDate: null },
+          take: 1,
+          orderBy: { startDate: "desc" },
+        },
       },
     }),
     prisma.contact.count({ where }),

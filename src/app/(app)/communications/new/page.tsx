@@ -10,10 +10,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
 
-const COMM_TYPES = ["PHONE_CALL", "MEETING_IN_PERSON", "MEETING_VIRTUAL", "EMAIL", "LETTER_MAILER", "EVENT_ACTION"];
+const COMM_TYPES = [
+  { value: "PHONE_CALL", label: "Phone Call" },
+  { value: "MEETING_IN_PERSON", label: "Meeting In Person" },
+  { value: "MEETING_VIRTUAL", label: "Meeting Virtual" },
+  { value: "EMAIL", label: "Email" },
+  { value: "LETTER_MAILER", label: "Letter/Mailer" },
+  { value: "EVENT_ACTION", label: "Event/Action" },
+  { value: "TEXT", label: "Text" },
+  { value: "LEFT_VOICEMAIL", label: "Left Voicemail" },
+];
 
 export default function NewCommunicationPage() {
   const router = useRouter();
@@ -22,7 +32,17 @@ export default function NewCommunicationPage() {
   const [contactSearch, setContactSearch] = React.useState("");
   const [contactResults, setContactResults] = React.useState<any[]>([]);
   const [selectedContacts, setSelectedContacts] = React.useState<any[]>([]);
+  const [followUpDate, setFollowUpDate] = React.useState("");
+  const [createFollowUpTask, setCreateFollowUpTask] = React.useState(false);
+  const [assignTaskToId, setAssignTaskToId] = React.useState<string>("");
+  const [users, setUsers] = React.useState<any[]>([]);
   const debouncedSearch = useDebounce(contactSearch);
+
+  React.useEffect(() => {
+    fetch("/api/users")
+      .then((r) => r.json())
+      .then((data) => setUsers(data.users || []));
+  }, []);
 
   React.useEffect(() => {
     if (debouncedSearch.length < 2) { setContactResults([]); return; }
@@ -50,6 +70,10 @@ export default function NewCommunicationPage() {
     const data: Record<string, any> = {};
     formData.forEach((v, k) => { if (v) data[k] = v; });
     data.contactIds = selectedContacts.map((c) => c.id);
+    if (followUpDate && createFollowUpTask) {
+      data.createFollowUpTask = true;
+      if (assignTaskToId) data.assignTaskToId = assignTaskToId;
+    }
 
     const res = await fetch("/api/communications", {
       method: "POST",
@@ -77,7 +101,7 @@ export default function NewCommunicationPage() {
               <Label>Type *</Label>
               <Select name="type" required>
                 <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                <SelectContent>{COMM_TYPES.map((t) => <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>)}</SelectContent>
+                <SelectContent>{COMM_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div><Label>Date *</Label><Input name="date" type="datetime-local" required defaultValue={new Date().toISOString().slice(0, 16)} /></div>
@@ -108,7 +132,33 @@ export default function NewCommunicationPage() {
               </div>
             </div>
             <div><Label>Notes</Label><Textarea name="notes" rows={4} /></div>
-            <div><Label>Follow-up Date</Label><Input name="followUpDate" type="datetime-local" /></div>
+            <div>
+              <Label>Follow-up Date</Label>
+              <Input name="followUpDate" type="datetime-local" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} />
+            </div>
+            {followUpDate && (
+              <div className="space-y-3 rounded-lg border p-3 bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="createTask"
+                    checked={createFollowUpTask}
+                    onCheckedChange={(checked) => setCreateFollowUpTask(checked === true)}
+                  />
+                  <Label htmlFor="createTask" className="font-normal cursor-pointer">Create follow-up task</Label>
+                </div>
+                {createFollowUpTask && (
+                  <div>
+                    <Label>Assign task to</Label>
+                    <Select value={assignTaskToId} onValueChange={setAssignTaskToId}>
+                      <SelectTrigger><SelectValue placeholder="Myself (default)" /></SelectTrigger>
+                      <SelectContent>
+                        {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex gap-2">
               <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Log Communication"}</Button>
               <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>

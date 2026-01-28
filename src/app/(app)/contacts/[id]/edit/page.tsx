@@ -12,6 +12,15 @@ import { useToast } from "@/hooks/use-toast";
 
 const CONTACT_TYPES = ["CANDIDATE", "ELECTED_OFFICIAL", "STAFF", "ORGANIZATION"] as const;
 const PARTIES = ["Democratic", "Republican", "Independent", "Green", "Libertarian", "Other", "Nonpartisan"];
+const TAX_STATUSES = [
+  { value: "C501C3", label: "501(c)(3) - Charitable" },
+  { value: "C501C4", label: "501(c)(4) - Social Welfare" },
+  { value: "C501C5", label: "501(c)(5) - Labor/Agricultural" },
+  { value: "C501C6", label: "501(c)(6) - Business League" },
+  { value: "FOR_PROFIT", label: "For-Profit" },
+  { value: "GOVERNMENT", label: "Government" },
+  { value: "OTHER", label: "Other" },
+];
 
 export default function EditContactPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +30,7 @@ export default function EditContactPage() {
   const [contact, setContact] = React.useState<any>(null);
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState("");
+  const [contactType, setContactType] = React.useState<string>("");
 
   React.useEffect(() => {
     fetch(`/api/contacts/${id}`)
@@ -28,6 +38,7 @@ export default function EditContactPage() {
       .then((data) => {
         setContact(data);
         setTags(data.tags || []);
+        setContactType(data.type || "");
       });
   }, [id]);
 
@@ -72,7 +83,7 @@ export default function EditContactPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label>Type *</Label>
-                <Select name="type" defaultValue={contact.type} required>
+                <Select name="type" value={contactType} onValueChange={setContactType} required>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{CONTACT_TYPES.map((t) => <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>)}</SelectContent>
                 </Select>
@@ -85,6 +96,15 @@ export default function EditContactPage() {
                 </Select>
               </div>
             </div>
+            {contactType === "ORGANIZATION" && (
+              <div>
+                <Label>Tax Status</Label>
+                <Select name="taxStatus" defaultValue={contact.taxStatus || ""}>
+                  <SelectTrigger><SelectValue placeholder="Select tax status" /></SelectTrigger>
+                  <SelectContent>{TAX_STATUSES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div><Label>First Name *</Label><Input name="firstName" defaultValue={contact.firstName} required /></div>
               <div><Label>Last Name *</Label><Input name="lastName" defaultValue={contact.lastName} required /></div>

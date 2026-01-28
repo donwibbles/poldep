@@ -12,6 +12,15 @@ import { useToast } from "@/hooks/use-toast";
 
 const CONTACT_TYPES = ["CANDIDATE", "ELECTED_OFFICIAL", "STAFF", "ORGANIZATION"] as const;
 const PARTIES = ["Democratic", "Republican", "Independent", "Green", "Libertarian", "Other", "Nonpartisan"];
+const TAX_STATUSES = [
+  { value: "C501C3", label: "501(c)(3) - Charitable" },
+  { value: "C501C4", label: "501(c)(4) - Social Welfare" },
+  { value: "C501C5", label: "501(c)(5) - Labor/Agricultural" },
+  { value: "C501C6", label: "501(c)(6) - Business League" },
+  { value: "FOR_PROFIT", label: "For-Profit" },
+  { value: "GOVERNMENT", label: "Government" },
+  { value: "OTHER", label: "Other" },
+];
 
 export default function NewContactPage() {
   const router = useRouter();
@@ -19,6 +28,7 @@ export default function NewContactPage() {
   const [loading, setLoading] = React.useState(false);
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState("");
+  const [contactType, setContactType] = React.useState<string>("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -65,7 +75,7 @@ export default function NewContactPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="type">Type *</Label>
-                <Select name="type" required>
+                <Select name="type" required value={contactType} onValueChange={setContactType}>
                   <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
                     {CONTACT_TYPES.map((t) => (
@@ -86,6 +96,20 @@ export default function NewContactPage() {
                 </Select>
               </div>
             </div>
+
+            {contactType === "ORGANIZATION" && (
+              <div>
+                <Label htmlFor="taxStatus">Tax Status</Label>
+                <Select name="taxStatus">
+                  <SelectTrigger><SelectValue placeholder="Select tax status" /></SelectTrigger>
+                  <SelectContent>
+                    {TAX_STATUSES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>

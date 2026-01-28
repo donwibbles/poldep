@@ -25,6 +25,42 @@ const TYPE_COLORS: Record<string, "default" | "secondary" | "success" | "warning
   ORGANIZATION: "warning",
 };
 
+const TAX_STATUS_LABELS: Record<string, string> = {
+  C501C3: "501(c)(3)",
+  C501C4: "501(c)(4)",
+  C501C5: "501(c)(5)",
+  C501C6: "501(c)(6)",
+  FOR_PROFIT: "For-Profit",
+  GOVERNMENT: "Government",
+  OTHER: "Other",
+};
+
+function getRoleAssignment(contact: any): string {
+  if (contact.type === "STAFF") {
+    const assignment = contact.staffAssignments?.[0];
+    if (assignment?.parentContact) {
+      return `Staff for ${assignment.parentContact.firstName} ${assignment.parentContact.lastName}`;
+    }
+    return "Unassigned";
+  }
+  if (contact.type === "CANDIDATE" || contact.type === "ELECTED_OFFICIAL") {
+    const position = contact.positionAssignments?.[0];
+    if (position) {
+      return position.jurisdiction
+        ? `${position.positionTitle} (${position.jurisdiction})`
+        : position.positionTitle;
+    }
+    return "-";
+  }
+  if (contact.type === "ORGANIZATION") {
+    if (contact.taxStatus) {
+      return TAX_STATUS_LABELS[contact.taxStatus] || contact.taxStatus;
+    }
+    return "-";
+  }
+  return contact.organization || "-";
+}
+
 export default function ContactsPage() {
   const router = useRouter();
 
@@ -104,7 +140,7 @@ export default function ContactsPage() {
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Organization</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Role / Assignment</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Email</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Phone</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Tags</th>
@@ -121,7 +157,7 @@ export default function ContactsPage() {
                           {contact.type.replace(/_/g, " ")}
                         </Badge>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{contact.organization || "-"}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500 max-w-[200px] truncate" title={getRoleAssignment(contact)}>{getRoleAssignment(contact)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{contact.email || "-"}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{contact.phone || "-"}</td>
                       <td className="px-4 py-3 text-sm">

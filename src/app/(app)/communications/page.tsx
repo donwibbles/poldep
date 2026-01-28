@@ -17,6 +17,8 @@ const COMM_TYPES = [
   { value: "EMAIL", label: "Email" },
   { value: "LETTER_MAILER", label: "Letter/Mailer" },
   { value: "EVENT_ACTION", label: "Event/Action" },
+  { value: "TEXT", label: "Text" },
+  { value: "LEFT_VOICEMAIL", label: "Left Voicemail" },
 ];
 
 export default function CommunicationsPage() {
