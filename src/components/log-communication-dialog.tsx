@@ -33,6 +33,9 @@ const COMMUNICATION_TYPES = [
   { value: "LEFT_VOICEMAIL", label: "Left Voicemail" },
 ];
 
+// Types that expect responses (for showing response options)
+const TRACKABLE_TYPES = ["EMAIL", "PHONE_CALL", "LEFT_VOICEMAIL", "LETTER_MAILER", "TEXT"];
+
 interface LogCommunicationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -61,6 +64,7 @@ export function LogCommunicationDialog({
   const [followUpDate, setFollowUpDate] = React.useState("");
   const [endorsementId, setEndorsementId] = React.useState("");
   const [createTask, setCreateTask] = React.useState(false);
+  const [markResponded, setMarkResponded] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
@@ -72,6 +76,7 @@ export function LogCommunicationDialog({
       setFollowUpDate("");
       setEndorsementId("");
       setCreateTask(false);
+      setMarkResponded(false);
     }
   }, [open]);
 
@@ -87,6 +92,13 @@ export function LogCommunicationDialog({
 
     setSaving(true);
 
+    // Determine response status
+    let responseStatus: string | undefined;
+    if (TRACKABLE_TYPES.includes(type)) {
+      responseStatus = markResponded ? "RESPONDED" : "AWAITING";
+    }
+    // Non-trackable types will get NOT_APPLICABLE from the API
+
     const data: any = {
       type,
       subject: subject.trim(),
@@ -96,6 +108,7 @@ export function LogCommunicationDialog({
       followUpDate: followUpDate ? new Date(followUpDate) : null,
       endorsementId: endorsementId || null,
       createFollowUpTask: createTask && !!followUpDate,
+      responseStatus,
     };
 
     const res = await fetch("/api/communications", {
@@ -193,6 +206,20 @@ export function LogCommunicationDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {TRACKABLE_TYPES.includes(type) && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="markResponded"
+                checked={markResponded}
+                onChange={(e) => setMarkResponded(e.target.checked)}
+              />
+              <Label htmlFor="markResponded" className="cursor-pointer">
+                Contact already responded
+              </Label>
             </div>
           )}
 

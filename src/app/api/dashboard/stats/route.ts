@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuthApi } from "@/lib/auth-helpers";
-import { subDays, startOfDay, format } from "date-fns";
+import { subDays, addDays, startOfDay, format } from "date-fns";
+import { getCurrentCycle } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
   const { session, error } = await requireAuthApi();
   if (error) return error;
+
+  const searchParams = request.nextUrl.searchParams;
+  const cycle = searchParams.get("cycle") || getCurrentCycle();
 
   const now = new Date();
   const thirtyDaysAgo = subDays(now, 30);
@@ -50,18 +54,28 @@ export async function GET(request: NextRequest) {
       ORDER BY date ASC
     `,
 
-    // Endorsement counts by decision
+    // Endorsement counts by decision (filtered by cycle)
     prisma.endorsement.groupBy({
       by: ["decision"],
+      where: {
+        race: {
+          election: { cycle },
+        },
+      },
       _count: true,
     }),
 
-    // Pipeline stage counts
+    // Pipeline stage counts (filtered by cycle)
     prisma.pipelineStage.findMany({
       orderBy: { order: "asc" },
       include: {
-        _count: {
-          select: { endorsements: true },
+        endorsements: {
+          where: {
+            race: {
+              election: { cycle },
+            },
+          },
+          select: { id: true },
         },
       },
     }),
@@ -96,7 +110,7 @@ export async function GET(request: NextRequest) {
       where: {
         date: {
           gte: now,
-          lte: subDays(now, -90),
+          lte: addDays(now, 90),
         },
       },
       orderBy: { date: "asc" },
@@ -151,7 +165,7 @@ export async function GET(request: NextRequest) {
   const pipelineData = pipelineCounts.map((stage) => ({
     name: stage.name,
     color: stage.color,
-    count: stage._count.endorsements,
+    count: stage.endorsements.length,
     isFinal: stage.isFinal,
   }));
 
@@ -208,6 +222,7 @@ export async function GET(request: NextRequest) {
   }));
 
   return NextResponse.json({
+    cycle,
     contacts: {
       total: totalContacts,
       byType: contactsByType,

@@ -14,12 +14,14 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatDate, formatRelative } from "@/lib/utils";
+import { formatDate, formatRelative, getCurrentCycle } from "@/lib/utils";
+import { CycleSelector } from "@/components/cycle-selector";
 import { ContactGrowthChart } from "@/components/charts/contact-growth-chart";
 import { EndorsementPipelineChart } from "@/components/charts/endorsement-pipeline-chart";
 import { CampaignStatsCard } from "@/components/charts/campaign-stats-card";
 
 interface DashboardStats {
+  cycle: string;
   contacts: {
     total: number;
     byType: Record<string, number>;
@@ -108,18 +110,36 @@ function StatCard({
 export default function DashboardPage() {
   const [stats, setStats] = React.useState<DashboardStats | null>(null);
   const [tasks, setTasks] = React.useState<any[]>([]);
+  const [cycles, setCycles] = React.useState<string[]>([]);
+  const [selectedCycle, setSelectedCycle] = React.useState(getCurrentCycle());
   const [loading, setLoading] = React.useState(true);
 
+  // Fetch available cycles
   React.useEffect(() => {
+    fetch("/api/elections/cycles")
+      .then((r) => r.json())
+      .then((data) => {
+        const fetchedCycles = data.cycles || [];
+        // Ensure current cycle is in the list
+        if (!fetchedCycles.includes(selectedCycle)) {
+          fetchedCycles.unshift(selectedCycle);
+        }
+        setCycles(fetchedCycles);
+      });
+  }, [selectedCycle]);
+
+  // Fetch dashboard data when cycle changes
+  React.useEffect(() => {
+    setLoading(true);
     Promise.all([
-      fetch("/api/dashboard/stats").then((r) => r.json()),
+      fetch(`/api/dashboard/stats?cycle=${selectedCycle}`).then((r) => r.json()),
       fetch("/api/tasks?status=PENDING&limit=10").then((r) => r.json()),
     ]).then(([statsData, tasksData]) => {
       setStats(statsData);
       setTasks(tasksData.tasks || []);
       setLoading(false);
     });
-  }, []);
+  }, [selectedCycle]);
 
   if (loading) {
     return <p className="text-sm text-gray-500">Loading dashboard...</p>;
@@ -131,7 +151,16 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        {cycles.length > 0 && (
+          <CycleSelector
+            value={selectedCycle}
+            onChange={setSelectedCycle}
+            cycles={cycles}
+          />
+        )}
+      </div>
 
       {/* Top Stats Row */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

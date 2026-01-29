@@ -56,6 +56,9 @@ export async function GET(
       positionAssignments: {
         orderBy: { startDate: "desc" },
       },
+      ratingHistory: {
+        orderBy: { year: "desc" },
+      },
     },
   });
 

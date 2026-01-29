@@ -78,6 +78,20 @@ enum CampaignType {
   DRIP_SEQUENCE
 }
 
+enum ContactRating {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum ResponseStatus {
+  AWAITING
+  RESPONDED
+  NO_RESPONSE
+  NOT_APPLICABLE
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -136,6 +150,7 @@ model Contact {
   staffAssignments    StaffAssignment[] @relation("StaffAssignments")
   parentAssignments   StaffAssignment[] @relation("ParentAssignments")
   positionAssignments PositionAssignment[]
+  ratingHistory       ContactRatingHistory[]
 
   @@index([lastName, firstName])
   @@index([tags], type: Gin)
@@ -158,16 +173,19 @@ model StaffAssignment {
 }
 
 model Communication {
-  id            String            @id @default(cuid())
-  type          CommunicationType
-  date          DateTime
-  subject       String
-  notes         String?
-  followUpDate  DateTime?
-  endorsementId String?
-  endorsement   Endorsement?      @relation(fields: [endorsementId], references: [id], onDelete: SetNull)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id             String            @id @default(cuid())
+  type           CommunicationType
+  date           DateTime
+  subject        String
+  notes          String?
+  followUpDate   DateTime?
+  endorsementId  String?
+  endorsement    Endorsement?      @relation(fields: [endorsementId], references: [id], onDelete: SetNull)
+  responseStatus ResponseStatus    @default(NOT_APPLICABLE)
+  responseDate   DateTime?
+  responseNotes  String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   contacts    CommunicationContact[]
   attachments Attachment[]
@@ -502,4 +520,20 @@ model QuestionnaireResponse {
 
   @@unique([questionnaireId, endorsementId])
   @@index([endorsementId])
+}
+
+model ContactRatingHistory {
+  id        String        @id @default(cuid())
+  contactId String
+  contact   Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  year      Int
+  rating    ContactRating
+  notes     String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([contactId, year])
+  @@index([contactId])
+  @@index([year])
+  @@index([rating])
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuthApi } from "@/lib/auth-helpers";
 import { logActivity } from "@/lib/activity";
-import { communicationSchema } from "@/lib/validations/communication";
+import { communicationSchema, TRACKABLE_COMM_TYPES } from "@/lib/validations/communication";
 import { getResend } from "@/lib/resend";
 import { buildTaskAssignmentHtml, buildTaskAssignmentText } from "@/lib/email-templates/task-assignment";
 import { EMAIL_FROM } from "@/lib/email-config";
@@ -56,11 +56,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { contactIds, createFollowUpTask, assignTaskToId, ...data } = parsed.data;
+  const { contactIds, createFollowUpTask, assignTaskToId, responseStatus, ...data } = parsed.data;
+
+  // Determine appropriate responseStatus based on communication type
+  // For trackable types (email, phone, etc.) default to AWAITING
+  // For non-trackable types (meetings, events) default to NOT_APPLICABLE
+  const isTrackable = (TRACKABLE_COMM_TYPES as readonly string[]).includes(data.type);
+  const effectiveResponseStatus = responseStatus || (isTrackable ? "AWAITING" : "NOT_APPLICABLE");
 
   const communication = await prisma.communication.create({
     data: {
       ...data,
+      responseStatus: effectiveResponseStatus,
       contacts: {
         create: contactIds.map((contactId: string) => ({ contactId })),
       },

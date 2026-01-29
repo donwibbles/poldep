@@ -7,8 +7,9 @@ import { Plus, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDate } from "@/lib/utils";
+import { formatDate, getCurrentCycle } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { CycleSelector } from "@/components/cycle-selector";
 
 type ViewMode = "kanban" | "table";
 
@@ -20,13 +21,28 @@ export default function EndorsementsPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [view, setView] = React.useState<ViewMode>("kanban");
+  const [cycles, setCycles] = React.useState<string[]>([]);
+  const [selectedCycle, setSelectedCycle] = React.useState(getCurrentCycle());
+
+  // Fetch available cycles
+  React.useEffect(() => {
+    fetch("/api/elections/cycles")
+      .then((r) => r.json())
+      .then((data) => {
+        const fetchedCycles = data.cycles || [];
+        if (!fetchedCycles.includes(selectedCycle)) {
+          fetchedCycles.unshift(selectedCycle);
+        }
+        setCycles(fetchedCycles);
+      });
+  }, [selectedCycle]);
 
   const fetchData = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [eRes, sRes] = await Promise.all([
-        fetch("/api/endorsements?limit=200"),
+        fetch(`/api/endorsements?limit=200&cycle=${selectedCycle}`),
         fetch("/api/pipeline-stages"),
       ]);
       if (!eRes.ok || !sRes.ok) {
@@ -42,7 +58,7 @@ export default function EndorsementsPage() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [selectedCycle, toast]);
 
   React.useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -71,6 +87,13 @@ export default function EndorsementsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Endorsement Pipeline</h1>
         <div className="flex gap-2">
+          {cycles.length > 0 && (
+            <CycleSelector
+              value={selectedCycle}
+              onChange={setSelectedCycle}
+              cycles={cycles}
+            />
+          )}
           <div className="flex rounded-md border">
             <Button variant={view === "kanban" ? "default" : "ghost"} size="sm" onClick={() => setView("kanban")}><LayoutGrid className="h-4 w-4" /></Button>
             <Button variant={view === "table" ? "default" : "ghost"} size="sm" onClick={() => setView("table")}><List className="h-4 w-4" /></Button>

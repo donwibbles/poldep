@@ -73,6 +73,8 @@ export async function POST(request: NextRequest) {
   }
 
   const emailId = event.data?.email_id;
+  console.log(`[Resend Webhook] Event: ${event.type}, emailId: ${emailId}`);
+
   if (!emailId) {
     return NextResponse.json({ error: "Missing email_id" }, { status: 400 });
   }

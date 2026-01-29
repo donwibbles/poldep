@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Globe, Plus, XCircle, Briefcase, Award, MessageSquare, Pencil } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Globe, Plus, XCircle, Briefcase, Award, MessageSquare, Pencil, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,9 @@ import { EndAssignmentDialog } from "@/components/end-assignment-dialog";
 import { PositionAssignmentDialog } from "@/components/position-assignment-dialog";
 import { EndPositionDialog } from "@/components/end-position-dialog";
 import { LogCommunicationDialog } from "@/components/log-communication-dialog";
+import { ContactRatingDialog } from "@/components/contact-rating-dialog";
+import { ContactRatingBadge } from "@/components/contact-rating-badge";
+import { ResponseStatusBadge } from "@/components/response-status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/utils";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -45,12 +48,23 @@ export default function ContactDetailPage() {
   const [deletePositionTarget, setDeletePositionTarget] = React.useState<any>(null);
   const [deletingPosition, setDeletingPosition] = React.useState(false);
   const [logCommOpen, setLogCommOpen] = React.useState(false);
+  const [ratingOpen, setRatingOpen] = React.useState(false);
+  const [responseStats, setResponseStats] = React.useState<{
+    totalOutreach: number;
+    responded: number;
+    noResponse: number;
+    awaiting: number;
+    responseRate: number | null;
+  } | null>(null);
 
   const fetchContact = React.useCallback(() => {
-    fetch(`/api/contacts/${id}`)
-      .then((r) => r.json())
-      .then(setContact)
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch(`/api/contacts/${id}`).then((r) => r.json()),
+      fetch(`/api/contacts/${id}/response-stats`).then((r) => r.json()),
+    ]).then(([contactData, statsData]) => {
+      setContact(contactData);
+      setResponseStats(statsData);
+    }).finally(() => setLoading(false));
   }, [id]);
 
   React.useEffect(() => { fetchContact(); }, [fetchContact]);
@@ -138,6 +152,22 @@ export default function ContactDetailPage() {
                 {contact.district && <div><dt className="text-sm text-gray-500">District</dt><dd className="text-sm font-medium">{contact.district}</dd></div>}
                 {contact.website && <div><dt className="text-sm text-gray-500">Website</dt><dd className="text-sm font-medium"><a href={contact.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1"><Globe className="h-3 w-3" />{contact.website}</a></dd></div>}
                 {contact.taxStatus && <div><dt className="text-sm text-gray-500">Tax Status</dt><dd className="text-sm font-medium">{TAX_STATUS_LABELS[contact.taxStatus] || contact.taxStatus}</dd></div>}
+                {responseStats && responseStats.totalOutreach > 0 && (
+                  <div>
+                    <dt className="text-sm text-gray-500">Response Rate</dt>
+                    <dd className="text-sm font-medium">
+                      {responseStats.responseRate !== null ? (
+                        <span className={responseStats.responseRate >= 50 ? "text-green-600" : "text-amber-600"}>
+                          {responseStats.responseRate}% ({responseStats.responded}/{responseStats.responded + responseStats.noResponse})
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">
+                          {responseStats.awaiting} awaiting
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                )}
               </dl>
             </CardContent>
           </Card>
@@ -169,7 +199,12 @@ export default function ContactDetailPage() {
                     <Link key={cc.communication.id} href={`/communications/${cc.communication.id}`} className="block rounded-lg border p-3 hover:bg-gray-50">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">{cc.communication.subject}</span>
-                        <Badge variant="outline" className="text-xs">{cc.communication.type.replace(/_/g, " ")}</Badge>
+                        <div className="flex items-center gap-2">
+                          {cc.communication.responseStatus && cc.communication.responseStatus !== "NOT_APPLICABLE" && (
+                            <ResponseStatusBadge status={cc.communication.responseStatus} />
+                          )}
+                          <Badge variant="outline" className="text-xs">{cc.communication.type.replace(/_/g, " ")}</Badge>
+                        </div>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">{formatDate(cc.communication.date)}</p>
                     </Link>
@@ -181,6 +216,50 @@ export default function ContactDetailPage() {
         </div>
 
         <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Rating</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setRatingOpen(true)}>
+                  <Star className="h-4 w-4 mr-1" />Set
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const currentYear = new Date().getFullYear();
+                const currentRating = contact.ratingHistory?.find((r: any) => r.year === currentYear);
+                const pastRatings = contact.ratingHistory?.filter((r: any) => r.year !== currentYear) || [];
+
+                return (
+                  <div>
+                    {currentRating ? (
+                      <div className="flex items-center gap-2 mb-2">
+                        <ContactRatingBadge rating={currentRating.rating} size="md" />
+                        <span className="text-sm text-gray-500">({currentYear})</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 mb-2">No rating for {currentYear}</p>
+                    )}
+                    {pastRatings.length > 0 && (
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-xs text-gray-500 mb-2">Previous Ratings</p>
+                        <div className="flex flex-wrap gap-2">
+                          {pastRatings.slice(0, 5).map((r: any) => (
+                            <div key={r.year} className="flex items-center gap-1">
+                              <span className="text-xs text-gray-400">{r.year}:</span>
+                              <ContactRatingBadge rating={r.rating} size="sm" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
           {contact.tags?.length > 0 && (
             <Card>
               <CardHeader><CardTitle>Tags</CardTitle></CardHeader>
@@ -407,6 +486,15 @@ export default function ContactDetailPage() {
         variant="destructive"
         onConfirm={handleDeletePosition}
         loading={deletingPosition}
+      />
+
+      <ContactRatingDialog
+        open={ratingOpen}
+        onOpenChange={setRatingOpen}
+        contactId={id}
+        contactName={`${contact.firstName} ${contact.lastName}`}
+        currentRating={contact.ratingHistory?.find((r: any) => r.year === new Date().getFullYear())}
+        onSaved={fetchContact}
       />
     </div>
   );

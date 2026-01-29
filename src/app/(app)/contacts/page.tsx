@@ -18,6 +18,7 @@ import {
 import { useDebounce } from "@/hooks/use-debounce";
 import { useToast } from "@/hooks/use-toast";
 import { US_STATES, PARTIES } from "@/lib/constants";
+import { ContactRatingBadge } from "@/components/contact-rating-badge";
 
 const CONTACT_TYPES = [
   { value: "", label: "All" },
@@ -38,6 +39,14 @@ const SORT_OPTIONS = [
   { value: "name_asc", label: "Name A-Z" },
   { value: "name_desc", label: "Name Z-A" },
   { value: "recent", label: "Recently Added" },
+];
+
+const RATING_OPTIONS = [
+  { value: "", label: "All Ratings" },
+  { value: "PLATINUM", label: "Platinum" },
+  { value: "GOLD", label: "Gold" },
+  { value: "SILVER", label: "Silver" },
+  { value: "BRONZE", label: "Bronze" },
 ];
 
 const TYPE_COLORS: Record<string, "default" | "secondary" | "success" | "warning"> = {
@@ -96,6 +105,7 @@ export default function ContactsPage() {
   const [stateFilter, setStateFilter] = React.useState("");
   const [partyFilter, setPartyFilter] = React.useState("");
   const [officeLevelFilter, setOfficeLevelFilter] = React.useState("");
+  const [ratingFilter, setRatingFilter] = React.useState("");
   const [sortBy, setSortBy] = React.useState("name_asc");
   const debouncedSearch = useDebounce(search);
 
@@ -108,6 +118,7 @@ export default function ContactsPage() {
     if (stateFilter) params.set("state", stateFilter);
     if (partyFilter) params.set("party", partyFilter);
     if (officeLevelFilter) params.set("officeLevel", officeLevelFilter);
+    if (ratingFilter) params.set("rating", ratingFilter);
     if (sortBy) params.set("sortBy", sortBy);
     params.set("page", pagination.page.toString());
 
@@ -126,7 +137,7 @@ export default function ContactsPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, typeFilter, stateFilter, partyFilter, officeLevelFilter, sortBy, pagination.page, toast]);
+  }, [debouncedSearch, typeFilter, stateFilter, partyFilter, officeLevelFilter, ratingFilter, sortBy, pagination.page, toast]);
 
   React.useEffect(() => { fetchContacts(); }, [fetchContacts]);
 
@@ -205,6 +216,17 @@ export default function ContactsPage() {
             </SelectContent>
           </Select>
 
+          <Select value={ratingFilter || "all"} onValueChange={(v) => { setRatingFilter(v === "all" ? "" : v); setPagination((p) => ({ ...p, page: 1 })); }}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue placeholder="All Ratings" />
+            </SelectTrigger>
+            <SelectContent>
+              {RATING_OPTIONS.map((r) => (
+                <SelectItem key={r.value || "all"} value={r.value || "all"}>{r.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setPagination((p) => ({ ...p, page: 1 })); }}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Sort by" />
@@ -239,6 +261,7 @@ export default function ContactsPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Role / Assignment</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Email</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Phone</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Rating</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Tags</th>
                   </tr>
                 </thead>
@@ -269,6 +292,13 @@ export default function ContactsPage() {
                       <td className="px-4 py-3 text-sm text-gray-500 max-w-[200px] truncate" title={getRoleAssignment(contact)}>{getRoleAssignment(contact)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{contact.email || "-"}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{contact.phone || "-"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm">
+                        {contact.ratingHistory?.[0] ? (
+                          <ContactRatingBadge rating={contact.ratingHistory[0].rating} />
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-sm">
                         <div className="flex gap-1 flex-wrap">
                           {contact.tags?.slice(0, 3).map((tag: string) => (

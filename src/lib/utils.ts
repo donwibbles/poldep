@@ -17,3 +17,10 @@ export function formatDateTime(date: Date | string) {
 export function formatRelative(date: Date | string) {
   return formatDistanceToNow(new Date(date), { addSuffix: true });
 }
+
+export function getCurrentCycle(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  // After November, show next year's cycle
+  return now.getMonth() >= 10 ? String(year + 1) : String(year);
+}

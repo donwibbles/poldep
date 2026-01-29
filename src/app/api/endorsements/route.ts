@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
   const decision = searchParams.get("decision") || "";
   const assignedToId = searchParams.get("assignedToId") || "";
   const candidateId = searchParams.get("candidateId") || "";
+  const cycle = searchParams.get("cycle") || "";
   const MAX_LIMIT = 100;
   const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
   const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "50"), 1), MAX_LIMIT);
@@ -23,6 +24,11 @@ export async function GET(request: NextRequest) {
   if (decision) where.decision = decision;
   if (assignedToId) where.assignedToId = assignedToId;
   if (candidateId) where.candidateId = candidateId;
+  if (cycle) {
+    where.race = {
+      election: { cycle },
+    };
+  }
 
   const [endorsements, total] = await Promise.all([
     prisma.endorsement.findMany({

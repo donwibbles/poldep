@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get("state") || "";
   const party = searchParams.get("party") || "";
   const officeLevel = searchParams.get("officeLevel") || "";
+  const rating = searchParams.get("rating") || "";
+  const ratingYear = searchParams.get("ratingYear") || "";
   const sortBy = searchParams.get("sortBy") || "name_asc";
   const MAX_LIMIT = 100;
   const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
@@ -51,6 +53,16 @@ export async function GET(request: NextRequest) {
         },
       };
     }
+  }
+
+  if (rating) {
+    const yearToFilter = ratingYear ? parseInt(ratingYear) : new Date().getFullYear();
+    where.ratingHistory = {
+      some: {
+        rating,
+        year: yearToFilter,
+      },
+    };
   }
 
   if (search) {
@@ -100,6 +112,10 @@ export async function GET(request: NextRequest) {
           where: { endDate: null },
           take: 1,
           orderBy: { startDate: "desc" },
+        },
+        ratingHistory: {
+          where: { year: new Date().getFullYear() },
+          take: 1,
         },
       },
     }),
