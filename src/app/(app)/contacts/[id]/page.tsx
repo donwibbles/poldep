@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Globe, Plus, XCircle, Briefcase, Award, MessageSquare, Pencil, Star } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Globe, Plus, XCircle, Briefcase, Award, MessageSquare, Pencil, Star, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,14 +56,17 @@ export default function ContactDetailPage() {
     awaiting: number;
     responseRate: number | null;
   } | null>(null);
+  const [initiatives, setInitiatives] = React.useState<any[]>([]);
 
   const fetchContact = React.useCallback(() => {
     Promise.all([
       fetch(`/api/contacts/${id}`).then((r) => r.json()),
       fetch(`/api/contacts/${id}/response-stats`).then((r) => r.json()),
-    ]).then(([contactData, statsData]) => {
+      fetch(`/api/contacts/${id}/initiatives`).then((r) => r.json()),
+    ]).then(([contactData, statsData, initiativesData]) => {
       setContact(contactData);
       setResponseStats(statsData);
+      setInitiatives(initiativesData.initiatives || []);
     }).finally(() => setLoading(false));
   }, [id]);
 
@@ -417,6 +420,68 @@ export default function ContactDetailPage() {
                       </Link>
                     </li>
                   ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          {initiatives.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-gray-400" />
+                  <CardTitle>Initiatives ({initiatives.length})</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {initiatives.map((item: any) => {
+                    const responseStatusColors: Record<string, string> = {
+                      NOT_CONTACTED: "secondary",
+                      AWAITING_RESPONSE: "default",
+                      RESPONDED_POSITIVE: "success",
+                      RESPONDED_NEGATIVE: "destructive",
+                      RESPONDED_NEUTRAL: "outline",
+                      NO_RESPONSE: "secondary",
+                    };
+                    const responseStatusLabels: Record<string, string> = {
+                      NOT_CONTACTED: "Not Contacted",
+                      AWAITING_RESPONSE: "Awaiting",
+                      RESPONDED_POSITIVE: "Supports",
+                      RESPONDED_NEGATIVE: "Opposes",
+                      RESPONDED_NEUTRAL: "Neutral",
+                      NO_RESPONSE: "No Response",
+                    };
+                    return (
+                      <li key={item.target.id}>
+                        <Link
+                          href={`/initiatives/${item.initiative.id}`}
+                          className="block rounded border p-3 hover:bg-gray-50"
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium">{item.initiative.name}</p>
+                            <Badge
+                              variant={responseStatusColors[item.target.responseStatus] as any}
+                              className="text-xs"
+                            >
+                              {responseStatusLabels[item.target.responseStatus]}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                            <span>{item.target.touchCount} touches</span>
+                            {item.target.lastContactDate && (
+                              <span>Last: {formatDate(item.target.lastContactDate)}</span>
+                            )}
+                          </div>
+                          {item.staffCommunications.length > 0 && (
+                            <p className="text-xs text-gray-400 mt-1">
+                              via staff: {item.staffCommunications.map((s: any) => `${s.staffName} (${s.count})`).join(", ")}
+                            </p>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ul>
               </CardContent>
             </Card>

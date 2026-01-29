@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,8 +26,17 @@ const COMM_TYPES = [
   { value: "LEFT_VOICEMAIL", label: "Left Voicemail" },
 ];
 
-export default function NewCommunicationPage() {
+// Types that expect responses (outbound communications)
+const TRACKABLE_TYPES = ["EMAIL", "PHONE_CALL", "LEFT_VOICEMAIL", "LETTER_MAILER", "TEXT"];
+
+interface Initiative {
+  id: string;
+  name: string;
+}
+
+function NewCommunicationForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [loading, setLoading] = React.useState(false);
   const [contactSearch, setContactSearch] = React.useState("");
@@ -36,13 +46,35 @@ export default function NewCommunicationPage() {
   const [createFollowUpTask, setCreateFollowUpTask] = React.useState(false);
   const [assignTaskToId, setAssignTaskToId] = React.useState<string>("");
   const [users, setUsers] = React.useState<any[]>([]);
+  const [initiatives, setInitiatives] = React.useState<Initiative[]>([]);
+  const [selectedInitiativeId, setSelectedInitiativeId] = React.useState(searchParams.get("initiativeId") || "");
   const debouncedSearch = useDebounce(contactSearch);
 
+  // Pre-populate contact from URL parameter
+  const preselectedContactId = searchParams.get("contactId");
+
   React.useEffect(() => {
-    fetch("/api/users")
-      .then((r) => r.json())
-      .then((data) => setUsers(data.users || []));
+    Promise.all([
+      fetch("/api/users").then((r) => r.json()),
+      fetch("/api/initiatives?status=ACTIVE&limit=50").then((r) => r.json()),
+    ]).then(([usersData, initiativesData]) => {
+      setUsers(usersData.users || []);
+      setInitiatives(initiativesData.initiatives || []);
+    });
   }, []);
+
+  // Load preselected contact
+  React.useEffect(() => {
+    if (preselectedContactId && selectedContacts.length === 0) {
+      fetch(`/api/contacts/${preselectedContactId}`)
+        .then((r) => r.json())
+        .then((contact) => {
+          if (contact && contact.id) {
+            setSelectedContacts([contact]);
+          }
+        });
+    }
+  }, [preselectedContactId, selectedContacts.length]);
 
   React.useEffect(() => {
     if (debouncedSearch.length < 2) { setContactResults([]); return; }
@@ -70,6 +102,9 @@ export default function NewCommunicationPage() {
     const data: Record<string, any> = {};
     formData.forEach((v, k) => { if (v) data[k] = v; });
     data.contactIds = selectedContacts.map((c) => c.id);
+    if (selectedInitiativeId) {
+      data.initiativeId = selectedInitiativeId;
+    }
     if (followUpDate && createFollowUpTask) {
       data.createFollowUpTask = true;
       if (assignTaskToId) data.assignTaskToId = assignTaskToId;
@@ -132,6 +167,21 @@ export default function NewCommunicationPage() {
               </div>
             </div>
             <div><Label>Notes</Label><Textarea name="notes" rows={4} /></div>
+
+            {initiatives.length > 0 && (
+              <div>
+                <Label>Link to Initiative</Label>
+                <Select value={selectedInitiativeId || "none"} onValueChange={(v) => setSelectedInitiativeId(v === "none" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="No initiative" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No initiative</SelectItem>
+                    {initiatives.map((i) => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">Link this communication to an active outreach initiative</p>
+              </div>
+            )}
+
             <div>
               <Label>Follow-up Date</Label>
               <Input name="followUpDate" type="datetime-local" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} />
@@ -167,5 +217,13 @@ export default function NewCommunicationPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function NewCommunicationPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-gray-500">Loading...</div>}>
+      <NewCommunicationForm />
+    </Suspense>
   );
 }

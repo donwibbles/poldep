@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { contactIds, createFollowUpTask, assignTaskToId, responseStatus, ...data } = parsed.data;
+  const { contactIds, createFollowUpTask, assignTaskToId, responseStatus, initiativeId, ...data } = parsed.data;
 
   // Determine appropriate responseStatus based on communication type
   // For trackable types (email, phone, etc.) default to AWAITING
@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
   const communication = await prisma.communication.create({
     data: {
       ...data,
+      initiativeId: initiativeId || null,
       responseStatus: effectiveResponseStatus,
       contacts: {
         create: contactIds.map((contactId: string) => ({ contactId })),
@@ -84,6 +85,11 @@ export async function POST(request: NextRequest) {
     summary: `Created ${communication.type.toLowerCase().replace(/_/g, " ")}: ${communication.subject}`,
     userId: session!.user.id,
   });
+
+  // Update initiative target stats if communication is linked to an initiative
+  if (initiativeId) {
+    await updateInitiativeTargetStats(initiativeId, contactIds, communication.date);
+  }
 
   // Create follow-up task if requested
   if (createFollowUpTask && communication.followUpDate) {
@@ -138,4 +144,72 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json(communication, { status: 201 });
+}
+
+/**
+ * Update initiative target stats when a communication is logged.
+ * Handles staff roll-up: if a staff member is contacted, also update the boss's target.
+ */
+async function updateInitiativeTargetStats(
+  initiativeId: string,
+  contactIds: string[],
+  communicationDate: Date
+) {
+  // Get the initiative's targets
+  const targets = await prisma.initiativeTarget.findMany({
+    where: { initiativeId },
+    select: { id: true, contactId: true },
+  });
+  const targetContactIds = new Set(targets.map((t) => t.contactId));
+
+  // Find staff assignments: if any contacted contact is staff of a target, include the target
+  const staffAssignments = await prisma.staffAssignment.findMany({
+    where: {
+      staffContactId: { in: contactIds },
+      parentContactId: { in: Array.from(targetContactIds) },
+      endDate: null,
+    },
+    select: { parentContactId: true },
+  });
+
+  // Combine direct contacts and staff roll-ups
+  const affectedTargetContactIds = new Set<string>();
+
+  // Direct contacts who are targets
+  for (const contactId of contactIds) {
+    if (targetContactIds.has(contactId)) {
+      affectedTargetContactIds.add(contactId);
+    }
+  }
+
+  // Staff contacts roll up to their boss
+  for (const assignment of staffAssignments) {
+    affectedTargetContactIds.add(assignment.parentContactId);
+  }
+
+  // Update each affected target
+  for (const contactId of affectedTargetContactIds) {
+    const target = targets.find((t) => t.contactId === contactId);
+    if (!target) continue;
+
+    await prisma.initiativeTarget.update({
+      where: { id: target.id },
+      data: {
+        touchCount: { increment: 1 },
+        lastContactDate: communicationDate,
+        firstContactDate: {
+          set: await prisma.initiativeTarget
+            .findUnique({ where: { id: target.id }, select: { firstContactDate: true } })
+            .then((t) => t?.firstContactDate || communicationDate),
+        },
+        responseStatus: {
+          set: await prisma.initiativeTarget
+            .findUnique({ where: { id: target.id }, select: { responseStatus: true } })
+            .then((t) =>
+              t?.responseStatus === "NOT_CONTACTED" ? "AWAITING_RESPONSE" : t?.responseStatus || "AWAITING_RESPONSE"
+            ),
+        },
+      },
+    });
+  }
 }

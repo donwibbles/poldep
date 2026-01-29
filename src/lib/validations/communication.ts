@@ -23,6 +23,7 @@ export const communicationSchema = z.object({
   notes: z.string().optional().nullable(),
   followUpDate: z.string().or(z.date()).transform((val) => new Date(val)).optional().nullable(),
   endorsementId: z.string().optional().nullable(),
+  initiativeId: z.string().optional().nullable(),
   contactIds: z.array(z.string()).min(1, "At least one contact is required"),
   createFollowUpTask: z.boolean().optional(),
   assignTaskToId: z.string().optional().nullable(),

@@ -36,6 +36,11 @@ const COMMUNICATION_TYPES = [
 // Types that expect responses (for showing response options)
 const TRACKABLE_TYPES = ["EMAIL", "PHONE_CALL", "LEFT_VOICEMAIL", "LETTER_MAILER", "TEXT"];
 
+interface Initiative {
+  id: string;
+  name: string;
+}
+
 interface LogCommunicationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -45,6 +50,7 @@ interface LogCommunicationDialogProps {
     id: string;
     race: { office: string; district?: string };
   }>;
+  defaultInitiativeId?: string;
   onCreated: () => void;
 }
 
@@ -54,6 +60,7 @@ export function LogCommunicationDialog({
   contactId,
   contactName,
   endorsements = [],
+  defaultInitiativeId,
   onCreated,
 }: LogCommunicationDialogProps) {
   const { toast } = useToast();
@@ -63,9 +70,18 @@ export function LogCommunicationDialog({
   const [date, setDate] = React.useState(new Date().toISOString().split("T")[0]);
   const [followUpDate, setFollowUpDate] = React.useState("");
   const [endorsementId, setEndorsementId] = React.useState("");
+  const [initiativeId, setInitiativeId] = React.useState(defaultInitiativeId || "");
+  const [initiatives, setInitiatives] = React.useState<Initiative[]>([]);
   const [createTask, setCreateTask] = React.useState(false);
   const [markResponded, setMarkResponded] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+
+  // Fetch active initiatives
+  React.useEffect(() => {
+    fetch("/api/initiatives?status=ACTIVE&limit=50")
+      .then((r) => r.json())
+      .then((data) => setInitiatives(data.initiatives || []));
+  }, []);
 
   React.useEffect(() => {
     if (!open) {
@@ -75,10 +91,11 @@ export function LogCommunicationDialog({
       setDate(new Date().toISOString().split("T")[0]);
       setFollowUpDate("");
       setEndorsementId("");
+      setInitiativeId(defaultInitiativeId || "");
       setCreateTask(false);
       setMarkResponded(false);
     }
-  }, [open]);
+  }, [open, defaultInitiativeId]);
 
   async function handleSubmit() {
     if (!subject.trim()) {
@@ -107,6 +124,7 @@ export function LogCommunicationDialog({
       contactIds: [contactId],
       followUpDate: followUpDate ? new Date(followUpDate) : null,
       endorsementId: endorsementId || null,
+      initiativeId: initiativeId || null,
       createFollowUpTask: createTask && !!followUpDate,
       responseStatus,
     };
@@ -202,6 +220,25 @@ export function LogCommunicationDialog({
                     <SelectItem key={e.id} value={e.id}>
                       {e.race.office}
                       {e.race.district ? ` - ${e.race.district}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {initiatives.length > 0 && (
+            <div>
+              <Label>Link to Initiative</Label>
+              <Select value={initiativeId || "none"} onValueChange={(v) => setInitiativeId(v === "none" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="No initiative" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No initiative</SelectItem>
+                  {initiatives.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>
+                      {i.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
