@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getAvailableVariables, previewMailMerge } from "@/lib/mail-merge";
+import { previewMailMerge } from "@/lib/mail-merge";
 import { sanitizeHtml } from "@/lib/sanitize";
 
 interface EmailTemplate {
@@ -55,8 +55,7 @@ export default function EmailTemplatesPage() {
   const [formSubject, setFormSubject] = React.useState("");
   const [formBody, setFormBody] = React.useState("");
 
-  const variables = getAvailableVariables();
-
+  
   const fetchTemplates = () => {
     fetch("/api/email-templates")
       .then((r) => r.json())
@@ -160,10 +159,6 @@ export default function EmailTemplatesPage() {
       });
     }
     setDeleting(false);
-  }
-
-  function insertVariable(variable: string) {
-    setFormBody((prev) => prev + variable);
   }
 
   return (
@@ -289,18 +284,19 @@ export default function EmailTemplatesPage() {
               <TabsList>
                 <TabsTrigger value="edit">Edit</TabsTrigger>
                 <TabsTrigger value="preview">Preview</TabsTrigger>
-                <TabsTrigger value="variables">Variables</TabsTrigger>
               </TabsList>
               <TabsContent value="edit" className="mt-2">
-                <Label>Body (HTML) *</Label>
-                <Textarea
-                  name="body"
-                  required
+                <Label className="mb-2 block">Body *</Label>
+                <input type="hidden" name="body" value={formBody} />
+                <RichTextEditor
                   value={formBody}
-                  onChange={(e) => setFormBody(e.target.value)}
-                  placeholder="<p>Dear {{firstName}},</p><p>Thank you for your support...</p>"
-                  className="min-h-[300px] font-mono text-sm"
+                  onChange={setFormBody}
+                  placeholder="Start typing your email content..."
+                  minHeight="300px"
                 />
+                <p className="text-xs text-gray-500 mt-2">
+                  Use the toolbar to format text and insert mail merge variables.
+                </p>
               </TabsContent>
               <TabsContent value="preview" className="mt-2">
                 <div className="border rounded-lg p-4 bg-white">
@@ -314,28 +310,6 @@ export default function EmailTemplatesPage() {
                       __html: sanitizeHtml(previewMailMerge(formBody)),
                     }}
                   />
-                </div>
-              </TabsContent>
-              <TabsContent value="variables" className="mt-2">
-                <div className="border rounded-lg p-4 bg-gray-50">
-                  <p className="text-sm text-gray-600 mb-3">
-                    Click a variable to insert it into the body:
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {variables.map((v) => (
-                      <button
-                        key={v.variable}
-                        type="button"
-                        onClick={() => insertVariable(v.variable)}
-                        className="flex items-center gap-2 p-2 text-left text-sm bg-white border rounded hover:bg-blue-50 hover:border-blue-300"
-                      >
-                        <code className="text-blue-600">{v.variable}</code>
-                        <span className="text-gray-500 text-xs">
-                          {v.description}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </TabsContent>
             </Tabs>

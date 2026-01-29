@@ -183,14 +183,16 @@ model CommunicationContact {
 }
 
 model PipelineStage {
-  id      String  @id @default(cuid())
-  name    String
-  order   Int     @unique
-  isFinal Boolean @default(false)
-  color   String  @default("#6B7280")
+  id                 String               @id @default(cuid())
+  name               String
+  order              Int                  @unique
+  isFinal            Boolean              @default(false)
+  color              String               @default("#6B7280")
+  decisionOnComplete EndorsementDecision? // Only set for isFinal=true stages
 
   endorsements         Endorsement[]
   endorsementHistories EndorsementStageHistory[]
+  questionnaires       Questionnaire[]
 }
 
 model Endorsement {
@@ -212,10 +214,11 @@ model Endorsement {
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
 
-  stageHistory   EndorsementStageHistory[]
-  communications Communication[]
-  tasks          Task[]
-  attachments    Attachment[]
+  stageHistory             EndorsementStageHistory[]
+  communications           Communication[]
+  tasks                    Task[]
+  attachments              Attachment[]
+  questionnaireResponses   QuestionnaireResponse[]
 }
 
 model EndorsementStageHistory {
@@ -413,6 +416,7 @@ model CampaignRecipient {
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   contactId  String
   email      String   // Snapshot of email at send time
+  emailStaff Boolean  @default(false) // true = email their staff, false = email directly
 
   // For drip sequences: track progress
   currentStep Int       @default(0)
@@ -445,4 +449,57 @@ model EmailEvent {
 
   @@index([campaignId])
   @@index([resendId])
+}
+
+model EmailSuppression {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  reason    String   // UNSUBSCRIBE, BOUNCE, COMPLAINT, MANUAL
+  source    String?  // campaignId or "manual"
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+model Questionnaire {
+  id        String     @id @default(cuid())
+  name      String
+  stageId   String?    // Auto-request when entering this stage
+  stage     PipelineStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  questions Question[]
+  responses QuestionnaireResponse[]
+
+  @@index([stageId])
+}
+
+model Question {
+  id              String        @id @default(cuid())
+  questionnaireId String
+  questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+  text            String
+  type            String        // TEXT, TEXTAREA, SINGLE_CHOICE, MULTI_CHOICE
+  options         String[]      // For choice questions
+  required        Boolean       @default(false)
+  order           Int
+
+  @@index([questionnaireId])
+}
+
+model QuestionnaireResponse {
+  id              String         @id @default(cuid())
+  questionnaireId String
+  questionnaire   Questionnaire  @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+  endorsementId   String
+  endorsement     Endorsement    @relation(fields: [endorsementId], references: [id], onDelete: Cascade)
+  answers         Json           // { questionId: answer }
+  submittedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([questionnaireId, endorsementId])
+  @@index([endorsementId])
 }

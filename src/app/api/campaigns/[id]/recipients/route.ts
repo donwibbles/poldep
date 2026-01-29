@@ -32,7 +32,7 @@ export async function GET(
     prisma.campaignRecipient.count({ where: { campaignId: id } }),
   ]);
 
-  // Get contact details for display
+  // Get contact details for display, including staff count for emailStaff recipients
   const contactIds = recipients.map((r) => r.contactId);
   const contacts = await prisma.contact.findMany({
     where: { id: { in: contactIds } },
@@ -42,14 +42,39 @@ export async function GET(
       lastName: true,
       email: true,
       organization: true,
+      type: true,
+      staffAssignments: {
+        where: { endDate: null },
+        select: {
+          staffContact: {
+            select: { email: true },
+          },
+        },
+      },
     },
   });
 
   const contactMap = new Map(contacts.map((c) => [c.id, c]));
-  const enrichedRecipients = recipients.map((r) => ({
-    ...r,
-    contact: contactMap.get(r.contactId) || null,
-  }));
+  const enrichedRecipients = recipients.map((r) => {
+    const contact = contactMap.get(r.contactId);
+    const staffWithEmail = contact?.staffAssignments.filter(
+      (sa) => sa.staffContact.email
+    ).length ?? 0;
+    return {
+      ...r,
+      contact: contact
+        ? {
+            id: contact.id,
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+            email: contact.email,
+            organization: contact.organization,
+            type: contact.type,
+          }
+        : null,
+      staffCount: r.emailStaff ? staffWithEmail : undefined,
+    };
+  });
 
   return NextResponse.json({
     recipients: enrichedRecipients,
@@ -93,14 +118,27 @@ export async function POST(
     );
   }
 
+  const { contactIds, emailStaff } = parsed.data;
+
   // Get contacts with valid emails
   const contacts = await prisma.contact.findMany({
     where: {
-      id: { in: parsed.data.contactIds },
+      id: { in: contactIds },
       email: { not: null },
     },
-    select: { id: true, email: true },
+    select: { id: true, email: true, type: true },
   });
+
+  // Reject emailStaff=true for STAFF type contacts
+  if (emailStaff) {
+    const staffContacts = contacts.filter((c) => c.type === "STAFF");
+    if (staffContacts.length > 0) {
+      return NextResponse.json(
+        { error: 'Staff contacts cannot use "Email their staff" mode' },
+        { status: 400 }
+      );
+    }
+  }
 
   if (contacts.length === 0) {
     return NextResponse.json(
@@ -134,6 +172,7 @@ export async function POST(
       campaignId: id,
       contactId: contact.id,
       email: contact.email!,
+      emailStaff: emailStaff ?? false,
     })),
   });
 

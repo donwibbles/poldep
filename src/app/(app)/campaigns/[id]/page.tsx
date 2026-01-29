@@ -18,10 +18,15 @@ import {
   UserPlus,
   X,
   Check,
+  Filter,
+  Tag,
+  UsersRound,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -32,11 +37,22 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { previewMailMerge } from "@/lib/mail-merge";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { useDebounce } from "@/hooks/use-debounce";
+import { US_STATES, PARTIES } from "@/lib/constants";
 
 interface Campaign {
   id: string;
@@ -63,6 +79,8 @@ interface Recipient {
   id: string;
   contactId: string;
   email: string;
+  emailStaff: boolean;
+  staffCount?: number;
   sentAt: string | null;
   openedAt: string | null;
   clickedAt: string | null;
@@ -74,6 +92,7 @@ interface Recipient {
     lastName: string;
     email: string;
     organization: string | null;
+    type: string;
   } | null;
 }
 
@@ -83,6 +102,30 @@ interface Contact {
   lastName: string;
   email: string;
   organization: string | null;
+  type: string;
+}
+
+interface PreviewItem {
+  recipientId: string;
+  contactName: string;
+  contactType: string;
+  mode: "direct" | "staff_outreach";
+  toAddresses: string[];
+  staffCount?: number;
+  isFallback?: boolean;
+  subject: string;
+  body: string;
+  emailStaff: boolean;
+}
+
+interface PreviewResponse {
+  previews: PreviewItem[];
+  totalCount: number;
+  directCount: number;
+  staffOutreachCount: number;
+  limit: number;
+  offset: number;
+  note: string;
 }
 
 const statusColors: Record<string, string> = {
@@ -102,7 +145,7 @@ export default function CampaignDetailPage() {
   const [loading, setLoading] = React.useState(true);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
-  const [sendOpen, setSendOpen] = React.useState(false);
+  const [sendConfirmOpen, setSendConfirmOpen] = React.useState(false);
   const [sending, setSending] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
 
@@ -114,8 +157,37 @@ export default function CampaignDetailPage() {
     new Set()
   );
   const [addingRecipients, setAddingRecipients] = React.useState(false);
+  const [emailStaff, setEmailStaff] = React.useState(false);
 
   const debouncedSearch = useDebounce(contactSearch, 300);
+
+  // Bulk add state
+  const [bulkMode, setBulkMode] = React.useState<"search" | "all" | "filter" | "tags">("search");
+  const [bulkFilters, setBulkFilters] = React.useState({
+    type: "",
+    state: "",
+    party: "",
+    officeLevel: "",
+  });
+  const [bulkTags, setBulkTags] = React.useState("");
+  const [bulkEmailStaff, setBulkEmailStaff] = React.useState(false);
+  const [bulkPreview, setBulkPreview] = React.useState<{
+    totalMatching: number;
+    alreadyAdded: number;
+    willAdd: number;
+  } | null>(null);
+  const [loadingPreview, setLoadingPreview] = React.useState(false);
+  const [allTags, setAllTags] = React.useState<string[]>([]);
+
+  // Email previews state
+  const [emailPreviews, setEmailPreviews] = React.useState<PreviewItem[]>([]);
+  const [previewStats, setPreviewStats] = React.useState<{
+    totalCount: number;
+    directCount: number;
+    staffOutreachCount: number;
+  } | null>(null);
+  const [loadingEmailPreviews, setLoadingEmailPreviews] = React.useState(false);
+  const [expandedPreviews, setExpandedPreviews] = React.useState<Set<string>>(new Set());
 
   const fetchCampaign = React.useCallback(() => {
     fetch(`/api/campaigns/${params.id}`)
@@ -143,10 +215,81 @@ export default function CampaignDetailPage() {
       });
   }, [params.id]);
 
+  const fetchEmailPreviews = React.useCallback(async () => {
+    setLoadingEmailPreviews(true);
+    try {
+      const res = await fetch(`/api/campaigns/${params.id}/preview?limit=10`);
+      const data: PreviewResponse = await res.json();
+      setEmailPreviews(data.previews || []);
+      setPreviewStats({
+        totalCount: data.totalCount,
+        directCount: data.directCount,
+        staffOutreachCount: data.staffOutreachCount,
+      });
+    } catch {
+      setEmailPreviews([]);
+      setPreviewStats(null);
+    }
+    setLoadingEmailPreviews(false);
+  }, [params.id]);
+
   React.useEffect(() => {
     fetchCampaign();
     fetchRecipients();
   }, [fetchCampaign, fetchRecipients]);
+
+  // Fetch email previews when recipients change
+  React.useEffect(() => {
+    if (recipients.length > 0) {
+      fetchEmailPreviews();
+    }
+  }, [recipients.length, fetchEmailPreviews]);
+
+  // Fetch all unique tags for tag selection
+  React.useEffect(() => {
+    fetch("/api/tags")
+      .then((r) => r.json())
+      .then((data) => {
+        setAllTags(data.tags || []);
+      })
+      .catch(() => setAllTags([]));
+  }, []);
+
+  // Fetch bulk preview when filters change
+  const fetchBulkPreview = React.useCallback(async () => {
+    if (bulkMode === "search") {
+      setBulkPreview(null);
+      return;
+    }
+
+    setLoadingPreview(true);
+    const queryParams = new URLSearchParams();
+    queryParams.set("mode", bulkMode === "all" ? "all_with_email" : bulkMode === "filter" ? "by_filter" : "by_tags");
+
+    if (bulkMode === "filter") {
+      if (bulkFilters.type) queryParams.set("type", bulkFilters.type);
+      if (bulkFilters.state) queryParams.set("state", bulkFilters.state);
+      if (bulkFilters.party) queryParams.set("party", bulkFilters.party);
+      if (bulkFilters.officeLevel) queryParams.set("officeLevel", bulkFilters.officeLevel);
+    } else if (bulkMode === "tags" && bulkTags) {
+      queryParams.set("tags", bulkTags);
+    }
+
+    try {
+      const res = await fetch(`/api/campaigns/${params.id}/recipients/bulk?${queryParams}`);
+      const data = await res.json();
+      setBulkPreview(data);
+    } catch {
+      setBulkPreview(null);
+    }
+    setLoadingPreview(false);
+  }, [bulkMode, bulkFilters, bulkTags, params.id]);
+
+  React.useEffect(() => {
+    if (addRecipientsOpen) {
+      fetchBulkPreview();
+    }
+  }, [addRecipientsOpen, fetchBulkPreview]);
 
   // Search contacts for adding recipients
   React.useEffect(() => {
@@ -203,7 +346,7 @@ export default function CampaignDetailPage() {
       });
     }
     setSending(false);
-    setSendOpen(false);
+    setSendConfirmOpen(false);
   }
 
   async function handlePause() {
@@ -257,7 +400,10 @@ export default function CampaignDetailPage() {
     const res = await fetch(`/api/campaigns/${params.id}/recipients`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contactIds: Array.from(selectedContacts) }),
+      body: JSON.stringify({
+        contactIds: Array.from(selectedContacts),
+        emailStaff,
+      }),
     });
 
     if (res.ok) {
@@ -270,6 +416,7 @@ export default function CampaignDetailPage() {
       setAddRecipientsOpen(false);
       setSelectedContacts(new Set());
       setContactSearch("");
+      setEmailStaff(false);
       fetchCampaign();
       fetchRecipients();
     } else {
@@ -277,6 +424,57 @@ export default function CampaignDetailPage() {
       toast({
         title: "Error",
         description: err.error,
+        variant: "destructive",
+      });
+    }
+    setAddingRecipients(false);
+  }
+
+  async function handleBulkAddRecipients() {
+    if (bulkMode === "search") return;
+    setAddingRecipients(true);
+
+    const body: any = {
+      mode: bulkMode === "all" ? "all_with_email" : bulkMode === "filter" ? "by_filter" : "by_tags",
+      emailStaff: bulkEmailStaff,
+    };
+
+    if (bulkMode === "filter") {
+      body.filters = {};
+      if (bulkFilters.type) body.filters.type = bulkFilters.type;
+      if (bulkFilters.state) body.filters.state = bulkFilters.state;
+      if (bulkFilters.party) body.filters.party = bulkFilters.party;
+      if (bulkFilters.officeLevel) body.filters.officeLevel = bulkFilters.officeLevel;
+    } else if (bulkMode === "tags" && bulkTags) {
+      body.tags = bulkTags.split(",").map((t) => t.trim()).filter(Boolean);
+    }
+
+    const res = await fetch(`/api/campaigns/${params.id}/recipients/bulk`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok) {
+      const result = await res.json();
+      toast({
+        title: "Recipients added",
+        description: `Added ${result.added} recipients${result.skipped > 0 ? ` (${result.skipped} already existed)` : ""}`,
+        variant: "success",
+      });
+      setAddRecipientsOpen(false);
+      setBulkMode("search");
+      setBulkFilters({ type: "", state: "", party: "", officeLevel: "" });
+      setBulkTags("");
+      setBulkEmailStaff(false);
+      setBulkPreview(null);
+      fetchCampaign();
+      fetchRecipients();
+    } else {
+      const err = await res.json();
+      toast({
+        title: "Error",
+        description: err.error || err.message,
         variant: "destructive",
       });
     }
@@ -303,6 +501,23 @@ export default function CampaignDetailPage() {
       });
     }
   }
+
+  function togglePreviewExpanded(recipientId: string) {
+    const newExpanded = new Set(expandedPreviews);
+    if (newExpanded.has(recipientId)) {
+      newExpanded.delete(recipientId);
+    } else {
+      newExpanded.add(recipientId);
+    }
+    setExpandedPreviews(newExpanded);
+  }
+
+  // Check if any selected contact is a staff type (for disabling emailStaff option)
+  const hasStaffSelected = React.useMemo(() => {
+    return searchResults.some(
+      (c) => selectedContacts.has(c.id) && c.type === "STAFF"
+    );
+  }, [searchResults, selectedContacts]);
 
   if (loading) {
     return <p className="text-sm text-gray-500">Loading...</p>;
@@ -371,7 +586,7 @@ export default function CampaignDetailPage() {
             Preview
           </Button>
           {canSend && (
-            <Button size="sm" onClick={() => setSendOpen(true)}>
+            <Button size="sm" onClick={() => setSendConfirmOpen(true)}>
               <Send className="h-4 w-4 mr-2" />
               Send Now
             </Button>
@@ -527,11 +742,20 @@ export default function CampaignDetailPage() {
                     className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded"
                   >
                     <div>
-                      <p className="font-medium">
-                        {recipient.contact
-                          ? `${recipient.contact.firstName} ${recipient.contact.lastName}`
-                          : recipient.email}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">
+                          {recipient.contact
+                            ? `${recipient.contact.firstName} ${recipient.contact.lastName}`
+                            : recipient.email}
+                        </p>
+                        {recipient.emailStaff && (
+                          <Badge variant="secondary" className="text-xs">
+                            {recipient.staffCount !== undefined && recipient.staffCount > 0
+                              ? `${recipient.staffCount} staff`
+                              : "Staff outreach"}
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500">{recipient.email}</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -574,7 +798,84 @@ export default function CampaignDetailPage() {
         </Card>
       </div>
 
-      {/* Email Preview Dialog */}
+      {/* Email Previews Section */}
+      {recipients.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="text-base">Email Previews</CardTitle>
+            <CardDescription>
+              Preview how emails will appear for each recipient
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingEmailPreviews ? (
+              <p className="text-sm text-gray-500">Loading previews...</p>
+            ) : (
+              <div className="space-y-2">
+                {emailPreviews.map((preview) => (
+                  <div key={preview.recipientId} className="border rounded">
+                    <button
+                      className="flex items-center justify-between w-full p-3 text-left hover:bg-gray-50"
+                      onClick={() => togglePreviewExpanded(preview.recipientId)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{preview.contactName}</span>
+                        {preview.mode === "staff_outreach" && (
+                          <Badge
+                            variant={preview.isFallback ? "outline" : "secondary"}
+                            className="text-xs"
+                          >
+                            {preview.staffCount && preview.staffCount > 0
+                              ? `${preview.staffCount} staff`
+                              : preview.toAddresses.length > 0
+                                ? "No staff - direct fallback"
+                                : "No staff or email - skipped"}
+                          </Badge>
+                        )}
+                        {preview.mode === "direct" && (
+                          <Badge variant="outline" className="text-xs">
+                            Direct
+                          </Badge>
+                        )}
+                      </div>
+                      {expandedPreviews.has(preview.recipientId) ? (
+                        <ChevronUp className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                    {expandedPreviews.has(preview.recipientId) && (
+                      <div className="p-4 border-t bg-gray-50 space-y-2">
+                        <div className="text-sm">
+                          <strong>To:</strong> {preview.toAddresses.join(", ") || "(none)"}
+                        </div>
+                        <div className="text-sm">
+                          <strong>Subject:</strong> {preview.subject}
+                        </div>
+                        <div className="border rounded p-3 bg-white">
+                          <div
+                            className="prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{
+                              __html: sanitizeHtml(preview.body),
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {previewStats && previewStats.totalCount > emailPreviews.length && (
+                  <p className="text-xs text-gray-500 text-center pt-2">
+                    Showing {emailPreviews.length} of {previewStats.totalCount} recipients
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Email Preview Dialog (sample data) */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -606,62 +907,320 @@ export default function CampaignDetailPage() {
       </Dialog>
 
       {/* Add Recipients Dialog */}
-      <Dialog open={addRecipientsOpen} onOpenChange={setAddRecipientsOpen}>
-        <DialogContent className="max-w-2xl">
+      <Dialog open={addRecipientsOpen} onOpenChange={(open) => {
+        setAddRecipientsOpen(open);
+        if (!open) {
+          setBulkMode("search");
+          setSelectedContacts(new Set());
+          setContactSearch("");
+          setEmailStaff(false);
+          setBulkEmailStaff(false);
+          setBulkFilters({ type: "", state: "", party: "", officeLevel: "" });
+          setBulkTags("");
+          setBulkPreview(null);
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Recipients</DialogTitle>
             <DialogDescription>
-              Search for contacts to add to this campaign. Only contacts with
-              email addresses are shown.
+              Add contacts to this campaign. Only contacts with email addresses will be included.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              placeholder="Search contacts..."
-              value={contactSearch}
-              onChange={(e) => setContactSearch(e.target.value)}
-            />
-            {searchResults.length > 0 && (
-              <div className="max-h-[300px] overflow-y-auto space-y-2">
-                {searchResults.map((contact) => (
-                  <div
-                    key={contact.id}
-                    className={`flex items-center justify-between p-3 border rounded cursor-pointer ${
-                      selectedContacts.has(contact.id)
-                        ? "border-blue-500 bg-blue-50"
-                        : "hover:bg-gray-50"
-                    }`}
-                    onClick={() => toggleContact(contact.id)}
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {contact.firstName} {contact.lastName}
-                      </p>
-                      <p className="text-sm text-gray-500">{contact.email}</p>
-                      {contact.organization && (
-                        <p className="text-xs text-gray-400">
-                          {contact.organization}
-                        </p>
+
+          <Tabs value={bulkMode} onValueChange={(v) => setBulkMode(v as typeof bulkMode)}>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="search" className="text-xs">
+                <Users className="h-3 w-3 mr-1" />
+                Search
+              </TabsTrigger>
+              <TabsTrigger value="all" className="text-xs">
+                <UsersRound className="h-3 w-3 mr-1" />
+                All
+              </TabsTrigger>
+              <TabsTrigger value="filter" className="text-xs">
+                <Filter className="h-3 w-3 mr-1" />
+                Filter
+              </TabsTrigger>
+              <TabsTrigger value="tags" className="text-xs">
+                <Tag className="h-3 w-3 mr-1" />
+                Tags
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="search" className="space-y-4 mt-4">
+              <Input
+                placeholder="Search contacts by name, email, or organization..."
+                value={contactSearch}
+                onChange={(e) => setContactSearch(e.target.value)}
+              />
+              {searchResults.length > 0 && (
+                <div className="max-h-[300px] overflow-y-auto space-y-2">
+                  {searchResults.map((contact) => (
+                    <div
+                      key={contact.id}
+                      className={`flex items-center justify-between p-3 border rounded cursor-pointer ${
+                        selectedContacts.has(contact.id)
+                          ? "border-blue-500 bg-blue-50"
+                          : "hover:bg-gray-50"
+                      }`}
+                      onClick={() => toggleContact(contact.id)}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">
+                            {contact.firstName} {contact.lastName}
+                          </p>
+                          <Badge variant="outline" className="text-xs">
+                            {contact.type.replace(/_/g, " ")}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-500">{contact.email}</p>
+                        {contact.organization && (
+                          <p className="text-xs text-gray-400">
+                            {contact.organization}
+                          </p>
+                        )}
+                      </div>
+                      {selectedContacts.has(contact.id) && (
+                        <Check className="h-5 w-5 text-blue-500" />
                       )}
                     </div>
-                    {selectedContacts.has(contact.id) && (
-                      <Check className="h-5 w-5 text-blue-500" />
-                    )}
+                  ))}
+                </div>
+              )}
+              {contactSearch.length >= 2 && searchResults.length === 0 && (
+                <p className="text-sm text-gray-500">
+                  No contacts found. Try a different search.
+                </p>
+              )}
+              {selectedContacts.size > 0 && (
+                <>
+                  <p className="text-sm text-gray-600">
+                    {selectedContacts.size} contact(s) selected
+                  </p>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                    <Switch
+                      checked={emailStaff}
+                      onCheckedChange={setEmailStaff}
+                      disabled={hasStaffSelected}
+                    />
+                    <div>
+                      <Label className="text-sm font-medium">
+                        Email their staff instead
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        {hasStaffSelected
+                          ? "Cannot use with staff contacts"
+                          : "Send one email to all staff members (they will see each other in TO field)"}
+                      </p>
+                    </div>
                   </div>
-                ))}
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="all" className="space-y-4 mt-4">
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <UsersRound className="h-5 w-5 text-blue-600" />
+                  <p className="font-medium text-blue-900">Add All Contacts with Email</p>
+                </div>
+                <p className="text-sm text-blue-700">
+                  This will add all contacts in the database that have an email address.
+                </p>
               </div>
-            )}
-            {contactSearch.length >= 2 && searchResults.length === 0 && (
-              <p className="text-sm text-gray-500">
-                No contacts found. Try a different search.
-              </p>
-            )}
-            {selectedContacts.size > 0 && (
-              <p className="text-sm text-gray-600">
-                {selectedContacts.size} contact(s) selected
-              </p>
-            )}
-          </div>
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                <Switch
+                  checked={bulkEmailStaff}
+                  onCheckedChange={setBulkEmailStaff}
+                />
+                <div>
+                  <Label className="text-sm font-medium">
+                    Email their staff instead
+                  </Label>
+                  <p className="text-xs text-gray-500">
+                    Staff contacts will be excluded when this is enabled
+                  </p>
+                </div>
+              </div>
+              {loadingPreview ? (
+                <p className="text-sm text-gray-500">Loading preview...</p>
+              ) : bulkPreview && (
+                <div className="p-3 bg-gray-50 rounded border text-sm">
+                  <p><strong>{bulkPreview.totalMatching}</strong> contacts with email addresses</p>
+                  <p><strong>{bulkPreview.alreadyAdded}</strong> already in this campaign</p>
+                  <p className="text-green-600 font-medium mt-1">
+                    <strong>{bulkPreview.willAdd}</strong> will be added
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="filter" className="space-y-4 mt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Contact Type</Label>
+                  <Select
+                    value={bulkFilters.type}
+                    onValueChange={(v) => setBulkFilters({ ...bulkFilters, type: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Any type</SelectItem>
+                      <SelectItem value="CANDIDATE">Candidate</SelectItem>
+                      <SelectItem value="ELECTED_OFFICIAL">Elected Official</SelectItem>
+                      <SelectItem value="STAFF">Staff</SelectItem>
+                      <SelectItem value="ORGANIZATION">Organization</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>State</Label>
+                  <Select
+                    value={bulkFilters.state}
+                    onValueChange={(v) => setBulkFilters({ ...bulkFilters, state: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Any state</SelectItem>
+                      {US_STATES.map((s) => (
+                        <SelectItem key={s.abbr} value={s.abbr}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Party</Label>
+                  <Select
+                    value={bulkFilters.party}
+                    onValueChange={(v) => setBulkFilters({ ...bulkFilters, party: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any party" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Any party</SelectItem>
+                      {PARTIES.map((p) => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Office Level</Label>
+                  <Select
+                    value={bulkFilters.officeLevel}
+                    onValueChange={(v) => setBulkFilters({ ...bulkFilters, officeLevel: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Any level</SelectItem>
+                      <SelectItem value="FEDERAL">Federal</SelectItem>
+                      <SelectItem value="STATE">State</SelectItem>
+                      <SelectItem value="LOCAL">Local</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                <Switch
+                  checked={bulkEmailStaff}
+                  onCheckedChange={setBulkEmailStaff}
+                  disabled={bulkFilters.type === "STAFF"}
+                />
+                <div>
+                  <Label className="text-sm font-medium">
+                    Email their staff instead
+                  </Label>
+                  <p className="text-xs text-gray-500">
+                    {bulkFilters.type === "STAFF"
+                      ? "Not available for staff contacts"
+                      : "Staff contacts will be excluded when this is enabled"}
+                  </p>
+                </div>
+              </div>
+              {loadingPreview ? (
+                <p className="text-sm text-gray-500">Loading preview...</p>
+              ) : bulkPreview && (
+                <div className="p-3 bg-gray-50 rounded border text-sm">
+                  <p><strong>{bulkPreview.totalMatching}</strong> contacts match filters</p>
+                  <p><strong>{bulkPreview.alreadyAdded}</strong> already in this campaign</p>
+                  <p className="text-green-600 font-medium mt-1">
+                    <strong>{bulkPreview.willAdd}</strong> will be added
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="tags" className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Tags (comma-separated)</Label>
+                <Input
+                  placeholder="e.g., union-member, endorsed-2024"
+                  value={bulkTags}
+                  onChange={(e) => setBulkTags(e.target.value)}
+                />
+                {allTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {allTags.slice(0, 20).map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className={`px-2 py-1 text-xs rounded border ${
+                          bulkTags.split(",").map(t => t.trim()).includes(tag)
+                            ? "bg-blue-100 border-blue-300 text-blue-700"
+                            : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                        }`}
+                        onClick={() => {
+                          const currentTags = bulkTags.split(",").map(t => t.trim()).filter(Boolean);
+                          if (currentTags.includes(tag)) {
+                            setBulkTags(currentTags.filter(t => t !== tag).join(", "));
+                          } else {
+                            setBulkTags([...currentTags, tag].join(", "));
+                          }
+                        }}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                <Switch
+                  checked={bulkEmailStaff}
+                  onCheckedChange={setBulkEmailStaff}
+                />
+                <div>
+                  <Label className="text-sm font-medium">
+                    Email their staff instead
+                  </Label>
+                  <p className="text-xs text-gray-500">
+                    Staff contacts will be excluded when this is enabled
+                  </p>
+                </div>
+              </div>
+              {loadingPreview ? (
+                <p className="text-sm text-gray-500">Loading preview...</p>
+              ) : bulkPreview && bulkTags && (
+                <div className="p-3 bg-gray-50 rounded border text-sm">
+                  <p><strong>{bulkPreview.totalMatching}</strong> contacts with selected tags</p>
+                  <p><strong>{bulkPreview.alreadyAdded}</strong> already in this campaign</p>
+                  <p className="text-green-600 font-medium mt-1">
+                    <strong>{bulkPreview.willAdd}</strong> will be added
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -669,32 +1228,113 @@ export default function CampaignDetailPage() {
                 setAddRecipientsOpen(false);
                 setSelectedContacts(new Set());
                 setContactSearch("");
+                setEmailStaff(false);
+                setBulkEmailStaff(false);
+                setBulkMode("search");
+                setBulkFilters({ type: "", state: "", party: "", officeLevel: "" });
+                setBulkTags("");
+                setBulkPreview(null);
               }}
             >
               Cancel
             </Button>
-            <Button
-              onClick={handleAddRecipients}
-              disabled={selectedContacts.size === 0 || addingRecipients}
-            >
-              {addingRecipients
-                ? "Adding..."
-                : `Add ${selectedContacts.size} Recipient(s)`}
-            </Button>
+            {bulkMode === "search" ? (
+              <Button
+                onClick={handleAddRecipients}
+                disabled={selectedContacts.size === 0 || addingRecipients}
+              >
+                {addingRecipients
+                  ? "Adding..."
+                  : `Add ${selectedContacts.size} Recipient(s)`}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleBulkAddRecipients}
+                disabled={
+                  addingRecipients ||
+                  !bulkPreview ||
+                  bulkPreview.willAdd === 0 ||
+                  (bulkMode === "tags" && !bulkTags.trim())
+                }
+              >
+                {addingRecipients
+                  ? "Adding..."
+                  : `Add ${bulkPreview?.willAdd || 0} Recipients`}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Send Confirmation */}
-      <ConfirmDialog
-        open={sendOpen}
-        onOpenChange={setSendOpen}
-        title="Send Campaign"
-        description={`Are you sure you want to send this campaign to ${campaign.totalRecipients} recipients? This action cannot be undone.`}
-        confirmLabel="Send Now"
-        onConfirm={handleSend}
-        loading={sending}
-      />
+      {/* Send Confirmation Modal with Previews */}
+      <Dialog open={sendConfirmOpen} onOpenChange={setSendConfirmOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Confirm Send</DialogTitle>
+            <DialogDescription>
+              Review recipients before sending. This will send emails to {campaign.totalRecipients} recipient(s).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Summary stats */}
+            {previewStats && (
+              <div className="flex gap-4">
+                <div className="p-3 bg-gray-100 rounded flex-1">
+                  <div className="text-2xl font-bold">{previewStats.directCount}</div>
+                  <div className="text-sm text-gray-500">Direct emails</div>
+                </div>
+                <div className="p-3 bg-gray-100 rounded flex-1">
+                  <div className="text-2xl font-bold">{previewStats.staffOutreachCount}</div>
+                  <div className="text-sm text-gray-500">Staff outreach</div>
+                </div>
+              </div>
+            )}
+
+            {/* Preview list */}
+            <div className="space-y-2">
+              <h4 className="font-medium">Preview (first 10)</h4>
+              {emailPreviews.slice(0, 10).map((preview) => (
+                <div key={preview.recipientId} className="p-3 border rounded text-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{preview.contactName}</span>
+                      {preview.mode === "staff_outreach" ? (
+                        <Badge
+                          variant={preview.isFallback ? "outline" : "secondary"}
+                          className="text-xs"
+                        >
+                          {preview.staffCount && preview.staffCount > 0
+                            ? `${preview.staffCount} staff`
+                            : "Fallback to direct"}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">Direct</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-gray-500 mt-1">
+                    To: {preview.toAddresses.join(", ") || "(none - will be skipped)"}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-xs text-gray-500">
+              Note: Preview shows current staff assignments. Actual send uses live data at send time.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSendConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSend} disabled={sending}>
+              {sending ? "Sending..." : `Send ${campaign.totalRecipients} Email(s)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation */}
       <ConfirmDialog

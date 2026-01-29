@@ -39,19 +39,25 @@ export async function POST(
     return NextResponse.json({ error: "Target stage not found" }, { status: 404 });
   }
 
-  // Determine decision based on final stage name
+  // Determine decision based on stage configuration or fall back to name matching
   let decision: "PENDING" | "ENDORSED" | "NOT_ENDORSED" | "NO_ENDORSEMENT" = "PENDING";
   let lockedAt: Date | null = null;
 
   if (targetStage.isFinal) {
     lockedAt = new Date();
-    const stageName = targetStage.name.toLowerCase();
-    if (stageName.includes("not endorsed")) {
-      decision = "NOT_ENDORSED";
-    } else if (stageName.includes("no endorsement")) {
-      decision = "NO_ENDORSEMENT";
-    } else if (stageName.includes("endorsed")) {
-      decision = "ENDORSED";
+    // Use configured decision if available, otherwise fall back to name matching
+    if (targetStage.decisionOnComplete) {
+      decision = targetStage.decisionOnComplete;
+    } else {
+      // Fallback for stages without decisionOnComplete configured
+      const stageName = targetStage.name.toLowerCase();
+      if (stageName.includes("not endorsed")) {
+        decision = "NOT_ENDORSED";
+      } else if (stageName.includes("no endorsement")) {
+        decision = "NO_ENDORSEMENT";
+      } else if (stageName.includes("endorsed")) {
+        decision = "ENDORSED";
+      }
     }
   }
 

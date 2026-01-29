@@ -18,6 +18,7 @@ export const campaignUpdateSchema = campaignSchema.partial();
 
 export const addRecipientsSchema = z.object({
   contactIds: z.array(z.string()).min(1, "At least one contact is required"),
+  emailStaff: z.boolean().optional().default(false),
 });
 
 export const sequenceStepSchema = z.object({

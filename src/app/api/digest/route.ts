@@ -4,6 +4,7 @@ import { getResend } from "@/lib/resend";
 import { checkDigestRateLimit } from "@/lib/rate-limit";
 import { format, subDays, subWeeks } from "date-fns";
 import { buildDigestHtml } from "@/lib/email-templates/digest";
+import { EMAIL_FROM } from "@/lib/email-config";
 
 export async function POST(request: NextRequest) {
   // Bearer token auth
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
   for (const recipient of recipients) {
     try {
       await getResend().emails.send({
-        from: "UFW CRM <info@bigperro.dev>",
+        from: EMAIL_FROM,
         to: recipient.email,
         subject: `UFW CRM ${frequency.toLowerCase()} digest - ${format(now, "MMM d, yyyy")}`,
         html: htmlBody,

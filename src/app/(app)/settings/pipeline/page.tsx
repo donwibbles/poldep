@@ -8,8 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
+
+const DECISION_OPTIONS = [
+  { value: "", label: "No decision (use name matching)" },
+  { value: "ENDORSED", label: "Endorsed" },
+  { value: "NOT_ENDORSED", label: "Not Endorsed" },
+  { value: "NO_ENDORSEMENT", label: "No Endorsement" },
+];
 
 export default function PipelineSettingsPage() {
   const { toast } = useToast();
@@ -22,6 +30,8 @@ export default function PipelineSettingsPage() {
   const [deleteTarget, setDeleteTarget] = React.useState<any>(null);
   const [deleting, setDeleting] = React.useState(false);
   const [reordering, setReordering] = React.useState(false);
+  const [addDecision, setAddDecision] = React.useState("");
+  const [editDecision, setEditDecision] = React.useState("");
 
   const fetchStages = () => {
     fetch("/api/pipeline-stages").then((r) => r.json()).then((data) => { setStages(data.stages || []); setLoading(false); });
@@ -33,12 +43,16 @@ export default function PipelineSettingsPage() {
     e.preventDefault();
     setAdding(true);
     const formData = new FormData(e.currentTarget);
-    const data = {
+    const isFinal = formData.get("isFinal") === "on";
+    const data: any = {
       name: formData.get("name") as string,
       order: stages.length,
-      isFinal: formData.get("isFinal") === "on",
+      isFinal,
       color: (formData.get("color") as string) || "#6B7280",
     };
+    if (isFinal && addDecision) {
+      data.decisionOnComplete = addDecision;
+    }
     const res = await fetch("/api/pipeline-stages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -47,6 +61,7 @@ export default function PipelineSettingsPage() {
     if (res.ok) {
       toast({ title: "Stage added", variant: "success" });
       setAddOpen(false);
+      setAddDecision("");
       fetchStages();
     } else {
       const err = await res.json();
@@ -60,12 +75,18 @@ export default function PipelineSettingsPage() {
     if (!editTarget) return;
     setEditing(true);
     const formData = new FormData(e.currentTarget);
-    const data = {
+    const isFinal = formData.get("isFinal") === "on";
+    const data: any = {
       name: formData.get("name") as string,
       order: editTarget.order,
-      isFinal: formData.get("isFinal") === "on",
+      isFinal,
       color: (formData.get("color") as string) || "#6B7280",
     };
+    if (isFinal) {
+      data.decisionOnComplete = editDecision || null;
+    } else {
+      data.decisionOnComplete = null;
+    }
     const res = await fetch(`/api/pipeline-stages/${editTarget.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -74,12 +95,18 @@ export default function PipelineSettingsPage() {
     if (res.ok) {
       toast({ title: "Stage updated", variant: "success" });
       setEditTarget(null);
+      setEditDecision("");
       fetchStages();
     } else {
       const err = await res.json();
       toast({ title: "Error", description: err.error, variant: "destructive" });
     }
     setEditing(false);
+  }
+
+  function openEdit(stage: any) {
+    setEditTarget(stage);
+    setEditDecision(stage.decisionOnComplete || "");
   }
 
   async function handleDelete() {
@@ -169,7 +196,7 @@ export default function PipelineSettingsPage() {
               <span className="flex-1 text-sm font-medium">{stage.name}</span>
               {stage.isFinal && <Badge variant="secondary">Final</Badge>}
               <span className="text-xs text-gray-400">{stage._count?.endorsements || 0} endorsements</span>
-              <Button variant="ghost" size="icon" onClick={() => setEditTarget(stage)} title="Edit stage">
+              <Button variant="ghost" size="icon" onClick={() => openEdit(stage)} title="Edit stage">
                 <Edit className="h-4 w-4 text-gray-400 hover:text-blue-500" />
               </Button>
               <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(stage)} title="Delete stage">
@@ -180,7 +207,7 @@ export default function PipelineSettingsPage() {
         ))}
       </div>
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) setAddDecision(""); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Pipeline Stage</DialogTitle>
@@ -190,8 +217,26 @@ export default function PipelineSettingsPage() {
             <div><Label>Name *</Label><Input name="name" required /></div>
             <div><Label>Color</Label><Input name="color" type="color" defaultValue="#6B7280" /></div>
             <div className="flex items-center gap-2">
-              <input type="checkbox" name="isFinal" id="isFinal" />
+              <input type="checkbox" name="isFinal" id="isFinal" onChange={(e) => { if (!e.target.checked) setAddDecision(""); }} />
               <Label htmlFor="isFinal">Final stage (locks endorsement)</Label>
+            </div>
+            <div>
+              <Label>Decision on Complete</Label>
+              <Select value={addDecision} onValueChange={setAddDecision}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select decision for final stages" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DECISION_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value || "none"} value={opt.value || "none"}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">
+                When an endorsement reaches this final stage, it will be set to this decision.
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
@@ -201,7 +246,7 @@ export default function PipelineSettingsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null); }}>
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) { setEditTarget(null); setEditDecision(""); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Pipeline Stage</DialogTitle>
@@ -211,8 +256,26 @@ export default function PipelineSettingsPage() {
             <div><Label>Name *</Label><Input name="name" required defaultValue={editTarget?.name} /></div>
             <div><Label>Color</Label><Input name="color" type="color" defaultValue={editTarget?.color || "#6B7280"} /></div>
             <div className="flex items-center gap-2">
-              <input type="checkbox" name="isFinal" id="editIsFinal" defaultChecked={editTarget?.isFinal} />
+              <input type="checkbox" name="isFinal" id="editIsFinal" defaultChecked={editTarget?.isFinal} onChange={(e) => { if (!e.target.checked) setEditDecision(""); }} />
               <Label htmlFor="editIsFinal">Final stage (locks endorsement)</Label>
+            </div>
+            <div>
+              <Label>Decision on Complete</Label>
+              <Select value={editDecision || "none"} onValueChange={(v) => setEditDecision(v === "none" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select decision for final stages" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DECISION_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value || "none"} value={opt.value || "none"}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">
+                When an endorsement reaches this final stage, it will be set to this decision.
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>

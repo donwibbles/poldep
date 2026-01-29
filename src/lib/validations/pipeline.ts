@@ -5,6 +5,7 @@ export const pipelineStageSchema = z.object({
   order: z.number().int().min(0),
   isFinal: z.boolean().default(false),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a valid hex color").default("#6B7280"),
+  decisionOnComplete: z.enum(["ENDORSED", "NOT_ENDORSED", "NO_ENDORSEMENT"]).optional().nullable(),
 });
 
 export const reorderStagesSchema = z.object({

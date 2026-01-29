@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { Resend } from "resend";
 import { prisma } from "@/lib/db";
 import { magicLinkSchema } from "@/lib/validations/user";
+import { EMAIL_FROM } from "@/lib/email-config";
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
 
   // Send email via Resend
   await getResend().emails.send({
-    from: "UFW CRM <info@bigperro.dev>",
+    from: EMAIL_FROM,
     to: email,
     subject: "Sign in to UFW CRM",
     html: `

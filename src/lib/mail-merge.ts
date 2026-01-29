@@ -1,4 +1,4 @@
-interface MailMergeContact {
+export interface MailMergeContact {
   firstName: string;
   lastName: string;
   title?: string | null;
@@ -12,6 +12,12 @@ interface MailMergeContact {
   district?: string | null;
   party?: string | null;
   website?: string | null;
+  bossFirstName?: string | null;
+  bossLastName?: string | null;
+  bossTitle?: string | null;
+  bossOrganization?: string | null;
+  bossDistrict?: string | null;
+  bossParty?: string | null;
 }
 
 const MAIL_MERGE_VARIABLES = [
@@ -28,6 +34,12 @@ const MAIL_MERGE_VARIABLES = [
   "district",
   "party",
   "website",
+  "bossFirstName",
+  "bossLastName",
+  "bossTitle",
+  "bossOrganization",
+  "bossDistrict",
+  "bossParty",
 ] as const;
 
 export type MailMergeVariable = (typeof MAIL_MERGE_VARIABLES)[number];
@@ -51,6 +63,12 @@ export function applyMailMerge(
   result = result.replace(/\{\{district\}\}/g, contact.district || "");
   result = result.replace(/\{\{party\}\}/g, contact.party || "");
   result = result.replace(/\{\{website\}\}/g, contact.website || "");
+  result = result.replace(/\{\{bossFirstName\}\}/g, contact.bossFirstName || "");
+  result = result.replace(/\{\{bossLastName\}\}/g, contact.bossLastName || "");
+  result = result.replace(/\{\{bossTitle\}\}/g, contact.bossTitle || "");
+  result = result.replace(/\{\{bossOrganization\}\}/g, contact.bossOrganization || "");
+  result = result.replace(/\{\{bossDistrict\}\}/g, contact.bossDistrict || "");
+  result = result.replace(/\{\{bossParty\}\}/g, contact.bossParty || "");
 
   return result;
 }
@@ -73,6 +91,12 @@ export function getAvailableVariables(): {
     { variable: "{{district}}", description: "Contact's district" },
     { variable: "{{party}}", description: "Contact's party affiliation" },
     { variable: "{{website}}", description: "Contact's website" },
+    { variable: "{{bossFirstName}}", description: "Boss/Principal's first name" },
+    { variable: "{{bossLastName}}", description: "Boss/Principal's last name" },
+    { variable: "{{bossTitle}}", description: "Boss/Principal's title" },
+    { variable: "{{bossOrganization}}", description: "Boss/Principal's organization" },
+    { variable: "{{bossDistrict}}", description: "Boss/Principal's district" },
+    { variable: "{{bossParty}}", description: "Boss/Principal's party affiliation" },
   ];
 }
 
@@ -91,6 +115,12 @@ export function getSampleContact(): MailMergeContact {
     district: "District 5",
     party: "Democratic",
     website: "https://johndoe.gov",
+    bossFirstName: "Jane",
+    bossLastName: "Smith",
+    bossTitle: "Congresswoman",
+    bossOrganization: "U.S. House of Representatives",
+    bossDistrict: "CA-12",
+    bossParty: "Democratic",
   };
 }
 

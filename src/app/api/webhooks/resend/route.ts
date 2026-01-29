@@ -139,12 +139,40 @@ export async function POST(request: NextRequest) {
         recipientUpdate.bouncedAt = now;
         campaignUpdate.totalBounced = { increment: 1 };
       }
+      // Auto-suppress bounced emails
+      try {
+        await prisma.emailSuppression.upsert({
+          where: { email: recipient.email.toLowerCase() },
+          create: {
+            email: recipient.email.toLowerCase(),
+            reason: "BOUNCE",
+            source: recipient.campaignId,
+          },
+          update: {}, // Don't update if already exists
+        });
+      } catch (err) {
+        console.error("Failed to suppress bounced email:", err);
+      }
       break;
     case "complained":
       // Treat complaints similar to bounces
       if (!recipient.bouncedAt) {
         recipientUpdate.bouncedAt = now;
         campaignUpdate.totalBounced = { increment: 1 };
+      }
+      // Auto-suppress complained emails
+      try {
+        await prisma.emailSuppression.upsert({
+          where: { email: recipient.email.toLowerCase() },
+          create: {
+            email: recipient.email.toLowerCase(),
+            reason: "COMPLAINT",
+            source: recipient.campaignId,
+          },
+          update: {}, // Don't update if already exists
+        });
+      } catch (err) {
+        console.error("Failed to suppress complained email:", err);
       }
       break;
   }

@@ -5,8 +5,8 @@ import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import {
   Select,
   SelectContent,
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { getAvailableVariables, previewMailMerge } from "@/lib/mail-merge";
+import { previewMailMerge } from "@/lib/mail-merge";
 import { sanitizeHtml } from "@/lib/sanitize";
 
 interface EmailTemplate {
@@ -51,8 +51,7 @@ export default function EditCampaignPage() {
   const [useSchedule, setUseSchedule] = React.useState(false);
   const [scheduledAt, setScheduledAt] = React.useState("");
 
-  const variables = getAvailableVariables();
-
+  
   React.useEffect(() => {
     Promise.all([
       fetch(`/api/campaigns/${params.id}`).then((r) => r.json()),
@@ -139,10 +138,6 @@ export default function EditCampaignPage() {
     setSaving(false);
   }
 
-  function insertVariable(variable: string) {
-    setBody((prev) => prev + variable);
-  }
-
   if (loading) {
     return <p className="text-sm text-gray-500">Loading...</p>;
   }
@@ -212,21 +207,24 @@ export default function EditCampaignPage() {
               />
             </div>
 
-            {/* Body with tabs */}
+            {/* Body with Rich Text Editor */}
             <Tabs defaultValue="edit" className="w-full">
               <TabsList>
                 <TabsTrigger value="edit">Edit</TabsTrigger>
                 <TabsTrigger value="preview">Preview</TabsTrigger>
-                <TabsTrigger value="variables">Variables</TabsTrigger>
               </TabsList>
               <TabsContent value="edit" className="mt-2">
-                <Label>Body (HTML) *</Label>
-                <Textarea
+                <Label className="mb-2 block">Body *</Label>
+                <RichTextEditor
                   value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  required
-                  className="min-h-[300px] font-mono text-sm"
+                  onChange={setBody}
+                  placeholder="Start typing your email content..."
+                  minHeight="300px"
                 />
+                <p className="text-xs text-gray-500 mt-2">
+                  Use the toolbar to format text and insert mail merge variables.
+                  Switch to HTML mode to edit raw HTML.
+                </p>
               </TabsContent>
               <TabsContent value="preview" className="mt-2">
                 <div className="border rounded-lg p-4 bg-white">
@@ -240,28 +238,6 @@ export default function EditCampaignPage() {
                       __html: sanitizeHtml(previewMailMerge(body)),
                     }}
                   />
-                </div>
-              </TabsContent>
-              <TabsContent value="variables" className="mt-2">
-                <div className="border rounded-lg p-4 bg-gray-50">
-                  <p className="text-sm text-gray-600 mb-3">
-                    Click a variable to insert it into the body:
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {variables.map((v) => (
-                      <button
-                        key={v.variable}
-                        type="button"
-                        onClick={() => insertVariable(v.variable)}
-                        className="flex items-center gap-2 p-2 text-left text-sm bg-white border rounded hover:bg-blue-50 hover:border-blue-300"
-                      >
-                        <code className="text-blue-600">{v.variable}</code>
-                        <span className="text-gray-500 text-xs">
-                          {v.description}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </TabsContent>
             </Tabs>

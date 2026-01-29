@@ -5,6 +5,7 @@ import { logActivity } from "@/lib/activity";
 import { communicationSchema } from "@/lib/validations/communication";
 import { getResend } from "@/lib/resend";
 import { buildTaskAssignmentHtml, buildTaskAssignmentText } from "@/lib/email-templates/task-assignment";
+import { EMAIL_FROM } from "@/lib/email-config";
 
 export async function GET(request: NextRequest) {
   const { session, error } = await requireAuthApi();
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
       try {
         const assigner = await prisma.user.findUnique({ where: { id: session!.user.id }, select: { name: true } });
         await getResend().emails.send({
-          from: "UFW CRM <info@bigperro.dev>",
+          from: EMAIL_FROM,
           to: task.assignedTo.email,
           subject: `Task assigned: ${task.title}`,
           html: buildTaskAssignmentHtml({
