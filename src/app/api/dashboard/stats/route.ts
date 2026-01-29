@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuthApi } from "@/lib/auth-helpers";
-import { subDays, addDays, startOfDay, format } from "date-fns";
+import { subDays, startOfDay, format } from "date-fns";
 import { getCurrentCycle } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
@@ -105,12 +105,11 @@ export async function GET(request: NextRequest) {
       },
     }),
 
-    // Upcoming elections (next 90 days)
+    // Upcoming elections (all future elections)
     prisma.election.findMany({
       where: {
         date: {
           gte: now,
-          lte: addDays(now, 90),
         },
       },
       orderBy: { date: "asc" },
