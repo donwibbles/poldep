@@ -43,10 +43,10 @@ export async function GET(request: NextRequest) {
 
     // Contact growth by day (last 30 days)
     prisma.$queryRaw<{ date: Date; count: bigint }[]>`
-      SELECT DATE(created_at) as date, COUNT(*) as count
+      SELECT DATE("createdAt") as date, COUNT(*) as count
       FROM "Contact"
-      WHERE created_at >= ${thirtyDaysAgo}
-      GROUP BY DATE(created_at)
+      WHERE "createdAt" >= ${thirtyDaysAgo}
+      GROUP BY DATE("createdAt")
       ORDER BY date ASC
     `,
 
